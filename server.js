@@ -36,7 +36,6 @@ try {
     console.log("Firebase Initialized Successfully");
 } catch (error) {
     console.error("Firebase Init Error:", error.message);
-    // যদি ফায়ারবেস ঠিক না হয়, সার্ভার বন্ধ না করে লগ দিবে যাতে আপনি বুঝতে পারেন সমস্যা কোথায়
 }
 
 const db = admin.database();
@@ -44,10 +43,11 @@ const db = admin.database();
 // Bot Initialization
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const userSessions = {}; 
+const audioCache = {}; // অডিও ইউআরএল সাময়িকভাবে রাখার জন্য
 
 const chatBoxConfig = {
     reply_markup: {
-        keyboard: [[{ text: "🤖 SavedMe Robot" }]],
+        keyboard: [[{ text: "🤖 SnapSavingBot" }]],
         resize_keyboard: true,
         input_field_placeholder: "Send me links"
     }
@@ -170,7 +170,7 @@ bot.on('message', async (msg) => {
                         ],
                         [{ text: "➕ Add Bot to Group", url: `https://t.me/${(await bot.getMe()).username}?startgroup=true` }]
                     ],
-                    keyboard: [[{ text: "🤖 SavedMe Robot" }]],
+                    keyboard: [[{ text: "🤖 SnapSavingBot" }]],
                     resize_keyboard: true,
                     input_field_placeholder: "Send me links"
                 }
@@ -201,6 +201,7 @@ bot.on('message', async (msg) => {
 
 bot.on('callback_query', async (q) => {
     const chatId = q.message.chat.id;
+    
     if (q.data === "verify_join") {
         const missingChannels = await getMissingChannels(chatId);
         if (missingChannels.length === 0) {
@@ -209,6 +210,17 @@ bot.on('callback_query', async (q) => {
             if (link) processDownload(chatId, link);
         } else {
             bot.answerCallbackQuery(q.id, { text: "❌ You haven't joined all channels yet!", show_alert: true });
+        }
+    }
+
+    // অডিও বাটনের লজিক
+    if (q.data === "send_audio") {
+        const audioUrl = audioCache[chatId];
+        if (audioUrl) {
+            bot.answerCallbackQuery(q.id, { text: "Sending Audio..." });
+            bot.sendAudio(chatId, audioUrl, { caption: "Use This - @SnapSavingBot" });
+        } else {
+            bot.answerCallbackQuery(q.id, { text: "Audio not found!", show_alert: true });
         }
     }
 });
@@ -220,8 +232,22 @@ async function processDownload(chatId, url) {
         const data = res.data.data;
         if (data && data.medias) {
             const video = data.medias.find(m => m.type === 'video') || data.medias[0];
-            const customCaption = `${data.title || ''}\n\nDownloaded by : @SavedMe_Robot`;
-            await bot.sendVideo(chatId, video.url, { caption: customCaption });
+            const audio = data.medias.find(m => m.type === 'audio');
+            
+            // অডিও ইউআরএল ক্যাশে সেভ করা যাতে বাটনে ক্লিক করলে পাওয়া যায়
+            if (audio) {
+                audioCache[chatId] = audio.url;
+            }
+
+            const customCaption = `Use This - @SnapSavingBot`;
+            const videoOpts = { 
+                caption: customCaption,
+                reply_markup: {
+                    inline_keyboard: audio ? [[{ text: "Audio 🎵", callback_data: "send_audio" }]] : []
+                }
+            };
+
+            await bot.sendVideo(chatId, video.url, videoOpts);
             await bot.deleteMessage(chatId, waitMsg.message_id);
         } else {
             bot.editMessageText("❌ Video not found or link not supported.", { chat_id: chatId, message_id: waitMsg.message_id });
