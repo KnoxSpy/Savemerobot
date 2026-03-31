@@ -85,31 +85,6 @@ app.post('/api/admin/del-channel', async (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/api/admin/broadcast', async (req, res) => {
-    const { img, text, btnText, btnUrl } = req.body;
-    const userSnap = await db.ref('all_users').once('value');
-    const users = userSnap.val() || {};
-    const userIds = Object.keys(users);
-    
-    let count = 0;
-    const opts = { parse_mode: 'Markdown' };
-    if (btnText && btnUrl) {
-        opts.reply_markup = { inline_keyboard: [[{ text: btnText, url: btnUrl }]] };
-    }
-
-    for (const id of userIds) {
-        try {
-            if (img && img.trim() !== "") {
-                await bot.sendPhoto(id, img, { caption: text, ...opts });
-            } else {
-                await bot.sendMessage(id, text, opts);
-            }
-            count++;
-        } catch (e) {}
-    }
-    res.json({ count });
-});
-
 // --- Bot Logic ---
 async function trackUser(chatId) {
     const today = new Date().toISOString().split('T')[0];
@@ -141,7 +116,8 @@ bot.on('message', async (msg) => {
 
     await trackUser(chatId).catch(() => {});
 
-    if (text === '/start') {
+    // ১. বাটনে ক্লিক করলে বা /start দিলে স্বাগতম জানাবে
+    if (text === '/start' || text === '🤖 SnapSavingBot') {
         try {
             const snap = await db.ref('admin_settings').once('value');
             const data = snap.val() || {};
@@ -169,11 +145,19 @@ bot.on('message', async (msg) => {
         const missingChannels = await getMissingChannels(chatId);
         if (missingChannels.length > 0) {
             userSessions[chatId] = text;
-            const buttons = missingChannels.map(c => [{ 
-                text: `📢 ${c.name}`, 
-                url: c.user.startsWith('http') ? c.user : `https://t.me/${c.user.replace('@','')}` 
-            }]);
+            
+            // ২. চ্যানেল বাটনগুলো প্রতি লাইনে ২টা করে সাজানো
+            const buttons = [];
+            for (let i = 0; i < missingChannels.length; i += 2) {
+                const row = missingChannels.slice(i, i + 2).map(c => ({
+                    text: `📢 ${c.name}`,
+                    url: c.user.startsWith('http') ? c.user : `https://t.me/${c.user.replace('@','')}`
+                }));
+                buttons.push(row);
+            }
+            // ভেরিফাই বাটনটি শেষে আলাদা লাইনে থাকবে
             buttons.push([{ text: "✅ Verify", callback_data: "verify_join" }]);
+
             return bot.sendMessage(chatId, "⚠️ **You must join our channels to use this bot!**", {
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: buttons }
@@ -204,40 +188,55 @@ bot.on('callback_query', async (q) => {
     }
 });
 
+// --- এনিমেশন ফাংশন ---
+function getProgressBar(percent) {
+    const totalBars = 10;
+    const filledBars = Math.round((percent / 100) * totalBars);
+    const emptyBars = totalBars - filledBars;
+    return "■".repeat(filledBars) + "□".repeat(emptyBars);
+}
+
 async function processDownload(chatId, url, msgId) {
-    // ১. Reaction দেওয়ার চেষ্টা (Error handle করা হয়েছে)
+    // ৩. Reaction দেওয়া
     if (msgId) {
         try {
-            // Raw API কল করা হয়েছে যাতে ভার্সন জনিত সমস্যা না হয়
             await bot._request('setMessageReaction', {
                 chat_id: chatId,
                 message_id: msgId,
                 reaction: JSON.stringify([{ type: 'emoji', emoji: '👀' }])
             });
-        } catch (e) { /* Reaction না কাজ করলে কোড থামবে না */ }
+        } catch (e) {}
     }
 
-    // ২. লোডিং মেসেজ শুরু
-    const waitMsg = await bot.sendMessage(chatId, "⏳ 1%", chatBoxConfig);
+    const loadingMsg = await bot.sendMessage(chatId, "⏳", chatBoxConfig);
     
-    let progress = 1;
-    const interval = setInterval(() => {
-        if (progress < 90) {
-            progress += Math.floor(Math.random() * 15) + 5;
-            if (progress > 90) progress = 90;
-            bot.editMessageText(`⏳ ${progress}%`, { chat_id: chatId, message_id: waitMsg.message_id }).catch(() => {});
+    let progress = 0;
+    let isDownloaded = false;
+
+    const interval = setInterval(async () => {
+        if (progress < 95 && !isDownloaded) {
+            progress += Math.floor(Math.random() * 10) + 5;
+            if (progress > 95) progress = 95;
+            const bar = getProgressBar(progress);
+            await bot.editMessageText(`⏳ Loading... [${bar}] ${progress}%`, {
+                chat_id: chatId,
+                message_id: loadingMsg.message_id
+            }).catch(() => {});
         }
-    }, 1000);
+    }, 800);
 
     try {
         const res = await axios.get(`https://r-gengpt-api.vercel.app/api/video/download?url=${encodeURIComponent(url)}`);
         const data = res.data.data;
-
+        isDownloaded = true;
         clearInterval(interval);
 
         if (data && data.medias) {
-            await bot.editMessageText("🪄 Success 100%", { chat_id: chatId, message_id: waitMsg.message_id }).catch(() => {});
-            
+            await bot.editMessageText(`🪄 Success [${getProgressBar(100)}] 100%`, {
+                chat_id: chatId,
+                message_id: loadingMsg.message_id
+            }).catch(() => {});
+
             const video = data.medias.find(m => m.type === 'video') || data.medias[0];
             const audio = data.medias.find(m => m.type === 'audio');
             if (audio) audioCache[chatId] = audio.url;
@@ -250,16 +249,18 @@ async function processDownload(chatId, url, msgId) {
             };
 
             await bot.sendVideo(chatId, video.url, videoOpts);
-            // ৩. লোডিং মেসেজটি ডিলিট করা
+            
+            // সব শেষে লোডিং মেসেজ ডিলিট করা
             setTimeout(() => {
-                bot.deleteMessage(chatId, waitMsg.message_id).catch(() => {});
-            }, 2000);
+                bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
+            }, 1000);
         } else {
-            bot.editMessageText("❌ Video not found.", { chat_id: chatId, message_id: waitMsg.message_id });
+            bot.editMessageText("❌ Video not found.", { chat_id: chatId, message_id: loadingMsg.message_id });
         }
     } catch (e) {
+        isDownloaded = true;
         clearInterval(interval);
-        bot.editMessageText("❌ Error fetching video.", { chat_id: chatId, message_id: waitMsg.message_id });
+        bot.editMessageText("❌ Error: Unable to fetch video.", { chat_id: chatId, message_id: loadingMsg.message_id });
     }
 }
 
