@@ -22,28 +22,24 @@ const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = 7767338426;
 
-// --- Firebase Initialization with Safety Check ---
+// --- Firebase Initialization ---
 try {
     if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
         throw new Error("FIREBASE_SERVICE_ACCOUNT Environment Variable is missing!");
     }
-    
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         databaseURL: process.env.FIREBASE_DB_URL
     });
-    console.log("Firebase Initialized Successfully");
 } catch (error) {
     console.error("Firebase Init Error:", error.message);
 }
 
 const db = admin.database();
-
-// Bot Initialization
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const userSessions = {}; 
-const audioCache = {}; // অডিও ইউআরএল সাময়িকভাবে রাখার জন্য
+const audioCache = {}; 
 
 const chatBoxConfig = {
     reply_markup: {
@@ -53,10 +49,7 @@ const chatBoxConfig = {
     }
 };
 
-// Health Check route for Render
-app.get('/', (req, res) => {
-    res.send('Bot is running...');
-});
+app.get('/', (req, res) => { res.send('Bot is running...'); });
 
 // --- Admin Panel API Routes ---
 app.get('/api/admin/data', async (req, res) => {
@@ -130,18 +123,13 @@ async function getMissingChannels(userId) {
     const snap = await db.ref('admin_settings/channels').once('value');
     const allChannels = snap.val() || [];
     if (allChannels.length === 0) return [];
-
     let missing = [];
     for (const ch of allChannels) {
         try {
             let username = ch.user.includes('t.me/') ? `@${ch.user.split('/').pop()}` : ch.user;
             const res = await bot.getChatMember(username, userId);
-            if (['left', 'kicked'].includes(res.status)) {
-                missing.push(ch);
-            }
-        } catch (e) {
-            missing.push(ch);
-        }
+            if (['left', 'kicked'].includes(res.status)) missing.push(ch);
+        } catch (e) { missing.push(ch); }
     }
     return missing;
 }
@@ -151,7 +139,7 @@ bot.on('message', async (msg) => {
     const text = msg.text;
     if (!text) return;
 
-    await trackUser(chatId).catch(e => console.error("Track User Error:", e));
+    await trackUser(chatId).catch(e => console.error(e));
 
     if (text === '/start') {
         try {
@@ -171,17 +159,15 @@ bot.on('message', async (msg) => {
                         [{ text: "➕ Add Bot to Group", url: `https://t.me/${(await bot.getMe()).username}?startgroup=true` }]
                     ],
                     keyboard: [[{ text: "🤖 SnapSavingBot" }]],
-                    resize_keyboard: true,
-                    input_field_placeholder: "Send me links"
+                    resize_keyboard: true
                 }
             };
             return bot.sendPhoto(chatId, welcomeImg, opts);
-        } catch (e) { console.error("Start Error:", e); }
+        } catch (e) { console.error(e); }
     }
 
     if (text.startsWith('http')) {
         const missingChannels = await getMissingChannels(chatId);
-        
         if (missingChannels.length > 0) {
             userSessions[chatId] = text;
             const buttons = missingChannels.map(c => [{ 
@@ -189,79 +175,86 @@ bot.on('message', async (msg) => {
                 url: c.user.startsWith('http') ? c.user : `https://t.me/${c.user.replace('@','')}` 
             }]);
             buttons.push([{ text: "✅ Verify", callback_data: "verify_join" }]);
-
             return bot.sendMessage(chatId, "⚠️ **You must join our channels to use this bot!**", {
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: buttons }
             });
         }
-        processDownload(chatId, text);
+        processDownload(chatId, text, msg.message_id);
     }
 });
 
 bot.on('callback_query', async (q) => {
     const chatId = q.message.chat.id;
-    
     if (q.data === "verify_join") {
         const missingChannels = await getMissingChannels(chatId);
         if (missingChannels.length === 0) {
             await bot.deleteMessage(chatId, q.message.message_id).catch(() => {});
             const link = userSessions[chatId];
-            if (link) processDownload(chatId, link);
+            if (link) processDownload(chatId, link, null);
         } else {
             bot.answerCallbackQuery(q.id, { text: "❌ You haven't joined all channels yet!", show_alert: true });
         }
     }
-
-    // অডিও বাটনের লজিক
     if (q.data === "send_audio") {
         const audioUrl = audioCache[chatId];
         if (audioUrl) {
             bot.answerCallbackQuery(q.id, { text: "Sending Audio..." });
             bot.sendAudio(chatId, audioUrl, { caption: "Use This - @SnapSavingBot" });
-        } else {
-            bot.answerCallbackQuery(q.id, { text: "Audio not found!", show_alert: true });
         }
     }
 });
 
-async function processDownload(chatId, url) {
-    const waitMsg = await bot.sendMessage(chatId, "⏳ Processing your link...", chatBoxConfig);
+async function processDownload(chatId, url, msgId) {
+    // ১. Reaction দেওয়া
+    if (msgId) {
+        bot.setMessageReaction(chatId, msgId, { reaction: [{ type: 'emoji', emoji: '👀' }] }).catch(() => {});
+    }
+
+    // ২. লোডিং মেসেজ শুরু
+    const waitMsg = await bot.sendMessage(chatId, "⏳ 1%", chatBoxConfig);
+    
+    let progress = 1;
+    const interval = setInterval(() => {
+        if (progress < 90) {
+            progress += Math.floor(Math.random() * 15);
+            if (progress > 90) progress = 90;
+            bot.editMessageText(`⏳ ${progress}%`, { chat_id: chatId, message_id: waitMsg.message_id }).catch(() => {});
+        }
+    }, 800);
+
     try {
         const res = await axios.get(`https://r-gengpt-api.vercel.app/api/video/download?url=${encodeURIComponent(url)}`);
         const data = res.data.data;
+
+        clearInterval(interval); // লোডিং থামানো
+
         if (data && data.medias) {
+            // ১০০% এবং Success দেখানো
+            await bot.editMessageText("🪄 Success 100%", { chat_id: chatId, message_id: waitMsg.message_id }).catch(() => {});
+            
             const video = data.medias.find(m => m.type === 'video') || data.medias[0];
             const audio = data.medias.find(m => m.type === 'audio');
-            
-            // অডিও ইউআরএল ক্যাশে সেভ করা যাতে বাটনে ক্লিক করলে পাওয়া যায়
-            if (audio) {
-                audioCache[chatId] = audio.url;
-            }
+            if (audio) audioCache[chatId] = audio.url;
 
-            const customCaption = `Use This - @SnapSavingBot`;
             const videoOpts = { 
-                caption: customCaption,
+                caption: `Use This - @SnapSavingBot`,
                 reply_markup: {
                     inline_keyboard: audio ? [[{ text: "Audio 🎵", callback_data: "send_audio" }]] : []
                 }
             };
 
             await bot.sendVideo(chatId, video.url, videoOpts);
-            await bot.deleteMessage(chatId, waitMsg.message_id);
+            // ৩. ⏳ ইমোজি ওয়ালা মেসেজটি ডিলিট করা
+            await bot.deleteMessage(chatId, waitMsg.message_id).catch(() => {});
         } else {
-            bot.editMessageText("❌ Video not found or link not supported.", { chat_id: chatId, message_id: waitMsg.message_id });
+            bot.editMessageText("❌ Video not found.", { chat_id: chatId, message_id: waitMsg.message_id });
         }
     } catch (e) {
-        bot.editMessageText("❌ Error: Unable to fetch video.", { chat_id: chatId, message_id: waitMsg.message_id });
+        clearInterval(interval);
+        bot.editMessageText("❌ Error fetching video.", { chat_id: chatId, message_id: waitMsg.message_id });
     }
 }
 
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'indexadmin.html'));
-});
-
-// Start Server
-app.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`);
-});
+app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'indexadmin.html')); });
+app.listen(PORT, () => { console.log(`Server started on port ${PORT}`); });
