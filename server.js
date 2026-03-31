@@ -20,18 +20,16 @@ app.use(bodyParser.json());
 
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = 7767338426;
 
 // --- Firebase Initialization ---
 try {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-        throw new Error("FIREBASE_SERVICE_ACCOUNT Environment Variable is missing!");
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            databaseURL: process.env.FIREBASE_DB_URL
+        });
     }
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: process.env.FIREBASE_DB_URL
-    });
 } catch (error) {
     console.error("Firebase Init Error:", error.message);
 }
@@ -120,18 +118,20 @@ async function trackUser(chatId) {
 }
 
 async function getMissingChannels(userId) {
-    const snap = await db.ref('admin_settings/channels').once('value');
-    const allChannels = snap.val() || [];
-    if (allChannels.length === 0) return [];
-    let missing = [];
-    for (const ch of allChannels) {
-        try {
-            let username = ch.user.includes('t.me/') ? `@${ch.user.split('/').pop()}` : ch.user;
-            const res = await bot.getChatMember(username, userId);
-            if (['left', 'kicked'].includes(res.status)) missing.push(ch);
-        } catch (e) { missing.push(ch); }
-    }
-    return missing;
+    try {
+        const snap = await db.ref('admin_settings/channels').once('value');
+        const allChannels = snap.val() || [];
+        if (allChannels.length === 0) return [];
+        let missing = [];
+        for (const ch of allChannels) {
+            try {
+                let username = ch.user.includes('t.me/') ? `@${ch.user.split('/').pop()}` : ch.user;
+                const res = await bot.getChatMember(username, userId);
+                if (['left', 'kicked', 'restricted'].includes(res.status)) missing.push(ch);
+            } catch (e) { missing.push(ch); }
+        }
+        return missing;
+    } catch (e) { return []; }
 }
 
 bot.on('message', async (msg) => {
@@ -139,7 +139,7 @@ bot.on('message', async (msg) => {
     const text = msg.text;
     if (!text) return;
 
-    await trackUser(chatId).catch(e => console.error(e));
+    await trackUser(chatId).catch(() => {});
 
     if (text === '/start') {
         try {
@@ -148,7 +148,7 @@ bot.on('message', async (msg) => {
             const welcomeMsg = data.welcomeText || "Welcome!";
             const welcomeImg = data.welcomeImage || "https://telegra.ph/file/default.jpg";
 
-            const opts = {
+            return bot.sendPhoto(chatId, welcomeImg, {
                 caption: welcomeMsg,
                 reply_markup: {
                     inline_keyboard: [
@@ -161,8 +161,7 @@ bot.on('message', async (msg) => {
                     keyboard: [[{ text: "🤖 SnapSavingBot" }]],
                     resize_keyboard: true
                 }
-            };
-            return bot.sendPhoto(chatId, welcomeImg, opts);
+            });
         } catch (e) { console.error(e); }
     }
 
@@ -206,9 +205,16 @@ bot.on('callback_query', async (q) => {
 });
 
 async function processDownload(chatId, url, msgId) {
-    // ১. Reaction দেওয়া
+    // ১. Reaction দেওয়ার চেষ্টা (Error handle করা হয়েছে)
     if (msgId) {
-        bot.setMessageReaction(chatId, msgId, { reaction: [{ type: 'emoji', emoji: '👀' }] }).catch(() => {});
+        try {
+            // Raw API কল করা হয়েছে যাতে ভার্সন জনিত সমস্যা না হয়
+            await bot._request('setMessageReaction', {
+                chat_id: chatId,
+                message_id: msgId,
+                reaction: JSON.stringify([{ type: 'emoji', emoji: '👀' }])
+            });
+        } catch (e) { /* Reaction না কাজ করলে কোড থামবে না */ }
     }
 
     // ২. লোডিং মেসেজ শুরু
@@ -217,20 +223,19 @@ async function processDownload(chatId, url, msgId) {
     let progress = 1;
     const interval = setInterval(() => {
         if (progress < 90) {
-            progress += Math.floor(Math.random() * 15);
+            progress += Math.floor(Math.random() * 15) + 5;
             if (progress > 90) progress = 90;
             bot.editMessageText(`⏳ ${progress}%`, { chat_id: chatId, message_id: waitMsg.message_id }).catch(() => {});
         }
-    }, 800);
+    }, 1000);
 
     try {
         const res = await axios.get(`https://r-gengpt-api.vercel.app/api/video/download?url=${encodeURIComponent(url)}`);
         const data = res.data.data;
 
-        clearInterval(interval); // লোডিং থামানো
+        clearInterval(interval);
 
         if (data && data.medias) {
-            // ১০০% এবং Success দেখানো
             await bot.editMessageText("🪄 Success 100%", { chat_id: chatId, message_id: waitMsg.message_id }).catch(() => {});
             
             const video = data.medias.find(m => m.type === 'video') || data.medias[0];
@@ -245,8 +250,10 @@ async function processDownload(chatId, url, msgId) {
             };
 
             await bot.sendVideo(chatId, video.url, videoOpts);
-            // ৩. ⏳ ইমোজি ওয়ালা মেসেজটি ডিলিট করা
-            await bot.deleteMessage(chatId, waitMsg.message_id).catch(() => {});
+            // ৩. লোডিং মেসেজটি ডিলিট করা
+            setTimeout(() => {
+                bot.deleteMessage(chatId, waitMsg.message_id).catch(() => {});
+            }, 2000);
         } else {
             bot.editMessageText("❌ Video not found.", { chat_id: chatId, message_id: waitMsg.message_id });
         }
