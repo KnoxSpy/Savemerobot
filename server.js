@@ -20,8 +20,38 @@ app.use(bodyParser.json());
 
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const TARGET_CHANNEL = '@reelsuploder'; // টার্গেট চ্যানেল
-const ADMIN_ID = '7304915019'; // অ্যাডমিন আইডি
+const TARGET_CHANNEL = 'reelsuploder'; 
+const ADMIN_ID = '7304915019'; 
+
+// --- Multilingual Localization Strings ---
+const strings = {
+    bn: {
+        welcome: "স্বাগতম! ভিডিও ডাউনলোড করতে লিংক পাঠান।",
+        must_join: "⚠️ আমাদের চ্যানেলে জয়েন করতে হবে এই বটটি ব্যবহার করতে!",
+        verify: "✅ ভেরিফাই করুন",
+        not_joined: "❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!",
+        sending_audio: "অডিও পাঠানো হচ্ছে...",
+        video_not_found: "❌ ভিডিও পাওয়া যায়নি।",
+        error_fetch: "❌ দুঃখিত, ভিডিওটি ডাউনলোড করা সম্ভব হয়নি।",
+        join_ch: "📢 চ্যানেলে জয়েন করুন",
+        join_gr: "👥 গ্রুপে জয়েন করুন",
+        add_gr: "➕ গ্রুপে বট যুক্ত করুন",
+        lang_btn: "🇬🇧 English এ পরিবর্তন করুন"
+    },
+    en: {
+        welcome: "Welcome! Send me a link to download videos.",
+        must_join: "⚠️ You must join our channels to use this bot!",
+        verify: "✅ Verify Join",
+        not_joined: "❌ You haven't joined all channels yet!",
+        sending_audio: "Sending Audio...",
+        video_not_found: "❌ Video not found.",
+        error_fetch: "❌ Error: Unable to fetch video.",
+        join_ch: "📢 Join Channel",
+        join_gr: "👥 Join Group",
+        add_gr: "➕ Add Bot to Group",
+        lang_btn: "🇧🇩 Change to বাংলা"
+    }
+};
 
 // --- Firebase Initialization ---
 try {
@@ -271,6 +301,12 @@ app.post('/api/video/view', async (req, res) => {
     }
 });
 
+// --- Bot Language Helper ---
+async function getUserLang(chatId) {
+    const snap = await db.ref(`users/${chatId}/lang`).once('value');
+    return snap.val() || 'bn'; // Default language is Bangla
+}
+
 // --- Bot Logic ---
 async function trackUser(chatId) {
     const today = new Date().toISOString().split('T')[0];
@@ -300,7 +336,7 @@ async function getMissingChannels(userId) {
 
 // @reelsuploder চ্যানেল থেকে ভিডিও অটো সিঙ্ক, লাইক এবং অ্যাডমিন অ্যালার্ট সিস্টেম
 bot.on('channel_post', async (msg) => {
-    const targetChannel = 'reelsuploder';
+    const targetChannel = TARGET_CHANNEL;
 
     if (msg.chat && msg.chat.username && msg.chat.username.toLowerCase() === targetChannel.toLowerCase()) {
         if (msg.video) {
@@ -357,32 +393,7 @@ bot.on('channel_post', async (msg) => {
     }
 });
 
-// চ্যানেল থেকে ডিলিট হওয়া ভিডিও ডাটাবেস থেকে রিমুভ করার ব্যাকগ্রাউন্ড টাস্ক
-async function cleanupDeletedVideos() {
-    try {
-        const snap = await db.ref('mini_app_videos').once('value');
-        const data = snap.val() || {};
-
-        for (const messageId of Object.keys(data)) {
-            const video = data[messageId];
-            try {
-                await bot.editMessageCaption(video.caption || "", {
-                    chat_id: TARGET_CHANNEL,
-                    message_id: parseInt(messageId)
-                });
-            } catch (err) {
-                if (err.message.includes("message to edit not found") || err.message.includes("message can't be edited")) {
-                    await db.ref(`mini_app_videos/${messageId}`).remove();
-                    console.log(`Removed deleted video: ${messageId}`);
-                }
-            }
-            await new Promise(resolve => setTimeout(resolve, 500)); 
-        }
-    } catch (e) {
-        console.error("Cleanup error:", e.message);
-    }
-}
-setInterval(cleanupDeletedVideos, 5 * 60 * 1000);
+// (নোট: আপনার রিকোয়ারমেন্টস অনুযায়ী অটোমেটিক রিমুভাল প্রসেসটি (cleanupDeletedVideos) সম্পূর্ণরূপে রিমুভ করা হয়েছে।)
 
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -393,20 +404,27 @@ bot.on('message', async (msg) => {
 
     if (text === '/start' || text === '🤖 SnapSavingBot') {
         try {
+            const lang = await getUserLang(chatId);
+            const str = strings[lang];
+
             const snap = await db.ref('admin_settings').once('value');
             const data = snap.val() || {};
-            const welcomeMsg = data.welcomeText || "Welcome!";
+            const welcomeMsg = data.welcomeText || str.welcome;
             const welcomeImg = data.welcomeImage || "https://telegra.ph/file/default.jpg";
+            
+            const botInfo = await bot.getMe();
+            const botUsername = botInfo.username;
 
             return bot.sendPhoto(chatId, welcomeImg, {
                 caption: welcomeMsg,
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: "📢 Join Channel", url: "https://t.me/+GyFgfeJIub81MDg9" },
-                            { text: "👥 Join Group", url: "https://t.me/+V8XTiO_Vo8tlOGZl" }
+                            { text: str.join_ch, url: "https://t.me/+GyFgfeJIub81MDg9" },
+                            { text: str.join_gr, url: "https://t.me/+V8XTiO_Vo8tlOGZl" }
                         ],
-                        [{ text: "➕ Add Bot to Group", url: `https://t.me/${(await bot.getMe()).username}?startgroup=true` }]
+                        [{ text: str.add_gr, url: `https://t.me/${botUsername}?startgroup=true` }],
+                        [{ text: str.lang_btn, callback_data: lang === 'bn' ? 'setlang_en' : 'setlang_bn' }]
                     ],
                     keyboard: [[{ text: "🤖 SnapSavingBot" }]],
                     resize_keyboard: true
@@ -416,6 +434,9 @@ bot.on('message', async (msg) => {
     }
 
     if (text.startsWith('http')) {
+        const lang = await getUserLang(chatId);
+        const str = strings[lang];
+
         const missingChannels = await getMissingChannels(chatId);
         if (missingChannels.length > 0) {
             userSessions[chatId] = text;
@@ -428,9 +449,9 @@ bot.on('message', async (msg) => {
                 }));
                 buttons.push(row);
             }
-            buttons.push([{ text: "✅ Verify", callback_data: "verify_join" }]);
+            buttons.push([{ text: str.verify, callback_data: "verify_join" }]);
 
-            return bot.sendMessage(chatId, "⚠️ **You must join our channels to use this bot!**", {
+            return bot.sendMessage(chatId, `⚠️ **${str.must_join}**`, {
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: buttons }
             });
@@ -442,8 +463,42 @@ bot.on('message', async (msg) => {
 bot.on('callback_query', async (q) => {
     const chatId = q.message.chat.id;
     const callbackData = q.data;
+    const lang = await getUserLang(chatId);
+    const str = strings[lang];
 
-    // ১. অ্যাডমিন কর্তৃক ভিডিও রিমুভ করার রিকোয়েস্ট প্রসেস
+    // ভাষা পরিবর্তন করার লজিক (বাংলা এবং ইংরেজি)
+    if (callbackData === "setlang_bn" || callbackData === "setlang_en") {
+        const newLang = callbackData === "setlang_bn" ? 'bn' : 'en';
+        await db.ref(`users/${chatId}/lang`).set(newLang);
+        
+        const newStr = strings[newLang];
+        const snap = await db.ref('admin_settings').once('value');
+        const data = snap.val() || {};
+        const welcomeMsg = data.welcomeText || newStr.welcome;
+        
+        const botInfo = await bot.getMe();
+        const botUsername = botInfo.username;
+
+        await bot.editMessageCaption(welcomeMsg, {
+            chat_id: chatId,
+            message_id: q.message.message_id,
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: newStr.join_ch, url: "https://t.me/+GyFgfeJIub81MDg9" },
+                        { text: newStr.join_gr, url: "https://t.me/+V8XTiO_Vo8tlOGZl" }
+                    ],
+                    [{ text: newStr.add_gr, url: `https://t.me/${botUsername}?startgroup=true` }],
+                    [{ text: newStr.lang_btn, callback_data: newLang === 'bn' ? 'setlang_en' : 'setlang_bn' }]
+                ]
+            }
+        }).catch(() => {});
+
+        await bot.answerCallbackQuery(q.id, { text: newLang === 'bn' ? "ভাষা পরিবর্তন করা হয়েছে।" : "Language has been changed.", show_alert: false });
+        return;
+    }
+
+    // অ্যাডমিন কর্তৃক ভিডিও রিমুভ করার রিকোয়েস্ট প্রসেস
     if (callbackData.startsWith("remove_vid_")) {
         if (q.from.id.toString() !== ADMIN_ID) {
             return bot.answerCallbackQuery(q.id, { text: "❌ আপনি এই ভিডিও রিমুভ করার জন্য অনুমোদিত নন!", show_alert: true });
@@ -451,10 +506,8 @@ bot.on('callback_query', async (q) => {
         
         const messageId = callbackData.replace("remove_vid_", "");
         try {
-            // ডাটাবেস থেকে ভিডিও রিমুভ করা হচ্ছে
             await db.ref(`mini_app_videos/${messageId}`).remove();
             
-            // অ্যাডমিন নোটিফিকেশন মেসেজ আপডেট
             await bot.editMessageText(`✅ <b>ভিডিওটি সার্ভার এবং মিনি অ্যাপ থেকে সফলভাবে রিমুভ করা হয়েছে!</b>\n\n🆔 Message ID: ${messageId}`, {
                 chat_id: q.message.chat.id,
                 message_id: q.message.message_id,
@@ -476,13 +529,13 @@ bot.on('callback_query', async (q) => {
             const link = userSessions[chatId];
             if (link) processDownload(chatId, link, null);
         } else {
-            bot.answerCallbackQuery(q.id, { text: "❌ You haven't joined all channels yet!", show_alert: true });
+            bot.answerCallbackQuery(q.id, { text: str.not_joined, show_alert: true });
         }
     }
     if (callbackData === "send_audio") {
         const audioUrl = audioCache[chatId];
         if (audioUrl) {
-            bot.answerCallbackQuery(q.id, { text: "Sending Audio..." });
+            bot.answerCallbackQuery(q.id, { text: str.sending_audio });
             bot.sendAudio(chatId, audioUrl, { caption: "Use This - @SnapSavingBot" });
         }
     }
@@ -496,6 +549,9 @@ function getProgressBar(percent) {
 }
 
 async function processDownload(chatId, url, msgId) {
+    const lang = await getUserLang(chatId);
+    const str = strings[lang];
+
     if (msgId) {
         try {
             await bot._request('setMessageReaction', {
@@ -548,7 +604,7 @@ async function processDownload(chatId, url, msgId) {
                 const ads = settings.ads || [];
                 if (ads.length > 0) {
                     const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                    adTextCaption = `\n\nAd → <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
+                    adTextCaption = `\n\nAds <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
                 }
             } catch (adErr) {
                 console.error("Ad append error:", adErr);
@@ -556,7 +612,7 @@ async function processDownload(chatId, url, msgId) {
 
             const botInfo = await bot.getMe();
             const botUsername = botInfo.username;
-            const shareText = encodeURIComponent(`SnapSavingBot ব্যবহার করে যেকোনো সোশ্যাল মিডিয়া ভিডিও সহজে ডাউনলোড করুন! 📥`);
+            const shareText = encodeURIComponent(`SnapSaving ব্যবহার করে যেকোনো সোশ্যাল মিডিয়া ভিডিও সহজে ডাউনলোড করুন! 📥`);
             const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
 
             const inlineKeyboardButtons = [];
@@ -582,12 +638,12 @@ async function processDownload(chatId, url, msgId) {
                 bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             }, 1000);
         } else {
-            bot.editMessageText("❌ Video not found.", { chat_id: chatId, message_id: loadingMsg.message_id });
+            bot.editMessageText(str.video_not_found, { chat_id: chatId, message_id: loadingMsg.message_id });
         }
     } catch (e) {
         isDownloaded = true;
         clearInterval(interval);
-        bot.editMessageText("❌ Error: Unable to fetch video.", { chat_id: chatId, message_id: loadingMsg.message_id });
+        bot.editMessageText(str.error_fetch, { chat_id: chatId, message_id: loadingMsg.message_id });
     }
 }
 
