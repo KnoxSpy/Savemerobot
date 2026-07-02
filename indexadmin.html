@@ -1,56 +1,309 @@
 <!DOCTYPE html>
-<html>
+<html lang="bn">
 <head>
+    <meta charset="UTF-8">
     <title>SaveMe Admin Panel</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; }
-        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        input, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        button { background: #0088cc; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-        .stats { font-size: 20px; font-weight: bold; color: #0088cc; }
+        :root {
+            --primary: #0088cc;
+            --primary-hover: #006699;
+            --bg: #f4f7f9;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-sub: #666666;
+            --border: #e2e8f0;
+            --danger: #e53e3e;
+            --success: #38a169;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text-main); padding: 20px; line-height: 1.6; }
+        
+        .container { max-width: 1000px; margin: 0 auto; }
+        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid var(--border); }
+        header h2 { font-size: 24px; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+        
+        /* Navigation Tabs */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; overflow-x: auto; }
+        .tab-btn { background: none; border: none; padding: 10px 20px; font-size: 15px; font-weight: 600; color: var(--text-sub); cursor: pointer; border-radius: 5px; transition: all 0.3s; white-space: nowrap; }
+        .tab-btn.active, .tab-btn:hover { background: var(--primary); color: white; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Card Styling */
+        .card { background: var(--card-bg); padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+        .card h3 { font-size: 18px; margin-bottom: 15px; color: #2d3748; border-left: 4px solid var(--primary); padding-left: 10px; }
+        
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--card-bg); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+        .stat-card p { font-size: 14px; color: var(--text-sub); }
+        .stat-card .stats { font-size: 24px; font-weight: bold; color: var(--primary); margin-top: 5px; }
+
+        /* Form Controls */
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+        input, textarea, select { width: 100%; padding: 10px 14px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 14px; background: #fafafa; }
+        input:focus, textarea:focus { outline: none; border-color: var(--primary); background: #fff; }
+        
+        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: background 0.2s; }
+        button:hover { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #c53030; }
+
+        /* Lists and Tables */
+        .item-list { list-style: none; margin-top: 10px; }
+        .item-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; }
+        .item-actions { display: flex; gap: 5px; }
+        .item-actions button { padding: 4px 10px; font-size: 12px; }
+
+        .helper-text { font-size: 12px; color: var(--text-sub); margin-top: -10px; margin-bottom: 15px; display: block; }
     </style>
 </head>
 <body>
-    <h2>🤖 SaveMe Admin Panel</h2>
-    
-    <div class="card">
-        <h3>📊 Daily Stats</h3>
-        <p>Today's Active Users: <span class="stats" id="userCount">0</span></p>
-    </div>
+    <div class="container">
+        <header>
+            <h2>🤖 SaveMe Admin Panel</h2>
+        </header>
 
-    <div class="card">
-        <h3>📝 Set Welcome Message</h3>
-        <input type="text" id="imgUrl" placeholder="Image URL">
-        <textarea id="welcomeMsg" rows="4" placeholder="Welcome Message Text"></textarea>
-        <button onclick="saveSettings()">Save Settings</button>
-    </div>
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="tab-btn" onclick="switchTab('ads')">Ad Manager</button>
+            <button class="tab-btn" onclick="switchTab('broadcast')">Broadcast</button>
+            <button class="tab-btn" onclick="switchTab('channels')">Channels</button>
+        </div>
 
-    <div class="card">
-        <h3>📢 Add Mandatory Channel</h3>
-        <input type="text" id="chName" placeholder="Channel Name">
-        <input type="text" id="chUser" placeholder="@Username or Link">
-        <button onclick="addChannel()">Add Channel</button>
-        <div id="channelList"></div>
+        <!-- 1. DASHBOARD TAB -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <p>Today's Active Users</p>
+                    <div class="stats" id="userCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <p>Monthly Active Users</p>
+                    <div class="stats" id="monthlyUsers">0</div>
+                </div>
+                <div class="stat-card">
+                    <p>Total Registered Users</p>
+                    <div class="stats" id="totalUsers">0</div>
+                </div>
+                <div class="stat-card">
+                    <p>Total Video Downloads</p>
+                    <div class="stats" id="totalDownloads">0</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📝 Set Welcome Message</h3>
+                <label>Image URL</label>
+                <input type="text" id="imgUrl" placeholder="https://example.com/welcome.jpg">
+                <label>Welcome Message Text</label>
+                <textarea id="welcomeMsg" rows="4" placeholder="Welcome Message Text"></textarea>
+                <button onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+
+        <!-- 2. AD MANAGER TAB -->
+        <div id="ads" class="tab-content">
+            <div class="card">
+                <h3 id="adFormTitle">📢 Set Ad</h3>
+                <input type="hidden" id="adId">
+                <label>Ad Text (যেমন: Join Our Channel)</label>
+                <input type="text" id="adText" placeholder="Ad Text">
+                <label>Ad Link</label>
+                <input type="text" id="adLink" placeholder="https://t.me/example">
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="saveAd()" id="saveAdBtn">Save Ad</button>
+                    <button onclick="resetAdForm()" class="btn-danger" id="cancelAdBtn" style="display:none;">Cancel Edit</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📋 Active Ads List</h3>
+                <div id="adList">No Ads found.</div>
+            </div>
+        </div>
+
+        <!-- 3. BROADCAST TAB -->
+        <div id="broadcast" class="tab-content">
+            <div class="card">
+                <h3>📢 Send Broadcast Message</h3>
+                <label>Broadcast Type</label>
+                <select id="bcType" onchange="toggleBcFields()">
+                    <option value="text">Text Only</option>
+                    <option value="photo">Photo with Caption</option>
+                </select>
+
+                <div id="photoField" style="display: none;">
+                    <label>Photo URL</label>
+                    <input type="text" id="bcPhotoUrl" placeholder="https://example.com/image.jpg">
+                </div>
+
+                <label>Message Content (HTML Supported)</label>
+                <textarea id="bcMessage" rows="6" placeholder="<b>Bold Text</b> or normal text."></textarea>
+                <span class="helper-text">Telegram HTML Tags: &lt;b&gt;, &lt;i&gt;, &lt;code&gt;, &lt;a href=""&gt;</span>
+
+                <label>Inline Buttons (Format: Button Name | Link - per line)</label>
+                <textarea id="bcButtons" rows="3" placeholder="Visit Website | https://google.com&#10;Join Channel | https://t.me/channel"></textarea>
+                <span class="helper-text">প্রতি লাইনে একটি বাটন দিতে হবে। ফরম্যাট: Button Name | URL</span>
+
+                <button onclick="sendBroadcast()">Send Broadcast</button>
+            </div>
+        </div>
+
+        <!-- 4. CHANNELS TAB -->
+        <div id="channels" class="tab-content">
+            <div class="card">
+                <h3>📢 Add Mandatory Channel</h3>
+                <label>Channel Name</label>
+                <input type="text" id="chName" placeholder="Channel Name">
+                <label>Username or Link</label>
+                <input type="text" id="chUser" placeholder="@Username or Link">
+                <button onclick="addChannel()">Add Channel</button>
+            </div>
+
+            <div class="card">
+                <h3>📋 Channel List</h3>
+                <div id="channelList"></div>
+            </div>
+        </div>
     </div>
 
     <script>
-        const API = ""; // Same domain
-
-        async function loadData() {
-            const res = await fetch('/api/admin/data');
-            const data = await res.json();
-            document.getElementById('userCount').innerText = data.dailyUsers || 0;
-            document.getElementById('welcomeMsg').value = data.welcomeText || "";
-            document.getElementById('imgUrl').value = data.welcomeImage || "";
+        // Tab switching logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             
-            let html = '<h4>Channels:</h4>';
-            (data.channels || []).forEach((c, i) => {
-                html += `<p>${c.name} (${c.user}) <button onclick="delChannel(${i})" style="background:red; padding:2px 5px;">X</button></p>`;
-            });
-            document.getElementById('channelList').innerHTML = html;
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
         }
 
+        function toggleBcFields() {
+            const type = document.getElementById('bcType').value;
+            document.getElementById('photoField').style.display = type === 'photo' ? 'block' : 'none';
+        }
+
+        async function loadData() {
+            try {
+                const res = await fetch('/api/admin/data');
+                const data = await res.json();
+                
+                // Set Stats
+                document.getElementById('userCount').innerText = data.dailyUsers || 0;
+                document.getElementById('monthlyUsers').innerText = data.monthlyUsers || 0;
+                document.getElementById('totalUsers').innerText = data.totalUsers || 0;
+                document.getElementById('totalDownloads').innerText = data.totalDownloads || 0;
+                
+                // Set Welcome Settings
+                document.getElementById('welcomeMsg').value = data.welcomeText || "";
+                document.getElementById('imgUrl').value = data.welcomeImage || "";
+                
+                // Render Channels
+                let chHtml = '';
+                if (data.channels && data.channels.length > 0) {
+                    chHtml = '<ul class="item-list">';
+                    data.channels.forEach((c, i) => {
+                        chHtml += `<li>
+                            <span><strong>${c.name}</strong> (${c.user})</span>
+                            <div class="item-actions">
+                                <button onclick="delChannel(${i})" class="btn-danger">Delete</button>
+                            </div>
+                        </li>`;
+                    });
+                    chHtml += '</ul>';
+                } else {
+                    chHtml = '<p>No channels added yet.</p>';
+                }
+                document.getElementById('channelList').innerHTML = chHtml;
+
+                // Render Ads
+                renderAdsList(data.ads || []);
+            } catch (err) {
+                console.error("Error loading data:", err);
+            }
+        }
+
+        // Ads Section Functions
+        function renderAdsList(ads) {
+            let html = '';
+            if (ads.length > 0) {
+                html = '<ul class="item-list">';
+                ads.forEach((ad, index) => {
+                    html += `<li>
+                        <span><strong>Text:</strong> ${ad.text} <br> <small><strong>Link:</strong> ${ad.link}</small></span>
+                        <div class="item-actions">
+                            <button onclick="editAd(${index}, '${ad.text}', '${ad.link}')" style="background:#f59e0b;">Edit</button>
+                            <button onclick="deleteAd(${index})" class="btn-danger">Delete</button>
+                        </div>
+                    </li>`;
+                });
+                html += '</ul>';
+            } else {
+                html = '<p>No active ads found.</p>';
+            }
+            document.getElementById('adList').innerHTML = html;
+        }
+
+        async function saveAd() {
+            const id = document.getElementById('adId').value;
+            const text = document.getElementById('adText').value;
+            const link = document.getElementById('adLink').value;
+
+            if (!text || !link) {
+                alert("Please fill in both fields");
+                return;
+            }
+
+            const payload = { text, link };
+            if (id !== "") {
+                payload.index = parseInt(id);
+            }
+
+            await fetch('/api/admin/save-ad', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            resetAdForm();
+            loadData();
+            alert("Ad saved!");
+        }
+
+        function editAd(index, text, link) {
+            document.getElementById('adId').value = index;
+            document.getElementById('adText').value = text;
+            document.getElementById('adLink').value = link;
+            document.getElementById('adFormTitle').innerText = "📝 Edit Ad";
+            document.getElementById('saveAdBtn').innerText = "Update Ad";
+            document.getElementById('cancelAdBtn').style.display = "inline-block";
+        }
+
+        function resetAdForm() {
+            document.getElementById('adId').value = "";
+            document.getElementById('adText').value = "";
+            document.getElementById('adLink').value = "";
+            document.getElementById('adFormTitle').innerText = "📢 Set Ad";
+            document.getElementById('saveAdBtn').innerText = "Save Ad";
+            document.getElementById('cancelAdBtn').style.display = "none";
+        }
+
+        async function deleteAd(index) {
+            if(confirm("Are you sure you want to delete this ad?")) {
+                await fetch('/api/admin/del-ad', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index})
+                });
+                loadData();
+            }
+        }
+
+        // Welcome Settings
         async function saveSettings() {
             const text = document.getElementById('welcomeMsg').value;
             const img = document.getElementById('imgUrl').value;
@@ -59,17 +312,47 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({text, img})
             });
-            alert("Saved!");
+            alert("Settings Saved!");
         }
 
+        // Broadcast System
+        async function sendBroadcast() {
+            const type = document.getElementById('bcType').value;
+            const photoUrl = document.getElementById('bcPhotoUrl').value;
+            const message = document.getElementById('bcMessage').value;
+            const buttonsText = document.getElementById('bcButtons').value;
+
+            if(!message) {
+                alert("Message cannot be empty!");
+                return;
+            }
+
+            if (confirm("Do you want to send this broadcast to all users?")) {
+                const res = await fetch('/api/admin/broadcast', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ type, photoUrl, message, buttonsText })
+                });
+                const result = await res.json();
+                alert(`Broadcast dynamic update completed. Success: ${result.successCount}, Failed: ${result.failCount}`);
+            }
+        }
+
+        // Channels Section Functions
         async function addChannel() {
             const name = document.getElementById('chName').value;
             const user = document.getElementById('chUser').value;
+            if(!name || !user) {
+                alert("Please fill in all fields");
+                return;
+            }
             await fetch('/api/admin/add-channel', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name, user})
             });
+            document.getElementById('chName').value = '';
+            document.getElementById('chUser').value = '';
             loadData();
         }
 
@@ -82,6 +365,7 @@
             loadData();
         }
 
+        // Initial Load
         loadData();
     </script>
 </body>
