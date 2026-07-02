@@ -280,25 +280,43 @@ async function getMissingChannels(userId) {
     } catch (e) { return []; }
 }
 
-// চ্যানেলে নতুন ভিডিও পোস্ট হওয়ার সাথে সাথে ডাটাবেসে সিঙ্ক
+// @reelsuploder চ্যানেল থেকে ভিডিও অটো সিঙ্ক এবং লাইক লজিক
 bot.on('channel_post', async (msg) => {
-    if (msg.video) {
-        try {
-            const video = msg.video;
-            const fileId = video.file_id;
-            const caption = msg.caption || "";
-            const messageId = msg.message_id;
+    const targetChannel = 'reelsuploder';
 
-            await db.ref(`mini_app_videos/${messageId}`).set({
-                fileId: fileId,
-                caption: caption,
-                likes: 0,
-                views: 0,
-                timestamp: admin.database.ServerValue.TIMESTAMP
-            });
-            console.log(`Video Synced: ${messageId}`);
-        } catch (err) {
-            console.error("Video sync error:", err.message);
+    // চ্যানেল ইউজারনেম ম্যাচিং (সরাসরি পোস্ট অথবা ফরওয়ার্ডেড পোস্টের ক্ষেত্রেও প্রযোজ্য)
+    if (msg.chat && msg.chat.username && msg.chat.username.toLowerCase() === targetChannel.toLowerCase()) {
+        if (msg.video) {
+            try {
+                const video = msg.video;
+                const fileId = video.file_id;
+                const caption = msg.caption || "";
+                const messageId = msg.message_id;
+
+                // ডাটাবেসে সেভ করার লজিক
+                await db.ref(`mini_app_videos/${messageId}`).set({
+                    fileId: fileId,
+                    caption: caption,
+                    likes: 0,
+                    views: 0,
+                    timestamp: admin.database.ServerValue.TIMESTAMP
+                });
+                console.log(`Video synced from @${targetChannel}: ${messageId}`);
+
+                // চ্যানেলে সফলভাবে সিঙ্ক করা পোস্টে একটি লাইক (👍) রিঅ্যাকশন দেওয়া
+                try {
+                    await bot._request('setMessageReaction', {
+                        chat_id: msg.chat.id,
+                        message_id: msg.message_id,
+                        reaction: JSON.stringify([{ type: 'emoji', emoji: '👍' }])
+                    });
+                } catch (reactErr) {
+                    console.error("Could not set reaction (Make sure bot is admin with reaction permission):", reactErr.message);
+                }
+
+            } catch (err) {
+                console.error("Video sync error:", err.message);
+            }
         }
     }
 });
@@ -426,14 +444,12 @@ async function processDownload(chatId, url, msgId) {
                 message_id: loadingMsg.message_id
             }).catch(() => {});
 
-            // মোট ডাউনলোড সংখ্যা বৃদ্ধি
             await db.ref('stats/total_downloads').transaction((current) => (current || 0) + 1);
 
             const video = data.medias.find(m => m.type === 'video') || data.medias[0];
             const audio = data.medias.find(m => m.type === 'audio');
             if (audio) audioCache[chatId] = audio.url;
 
-            // ডায়নামিক অ্যাড রোটেশন প্রসেস
             let adTextCaption = "";
             try {
                 const adminSnap = await db.ref('admin_settings').once('value');
@@ -441,13 +457,12 @@ async function processDownload(chatId, url, msgId) {
                 const ads = settings.ads || [];
                 if (ads.length > 0) {
                     const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                    adTextCaption = `\n\nAd → <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
+                    adTextCaption = `\n\n🚀 <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
                 }
             } catch (adErr) {
                 console.error("Ad append error:", adErr);
             }
 
-            // শেয়ার বাটন ইনফরমেশন
             const botInfo = await bot.getMe();
             const botUsername = botInfo.username;
             const shareText = encodeURIComponent(`SaveMe Bot ব্যবহার করে যেকোনো সোশ্যাল মিডিয়া ভিডিও সহজে ডাউনলোড করুন! 📥`);
