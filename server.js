@@ -8,7 +8,7 @@ const cors = require('cors');
 
 // --- Global Error Handling ---
 process.on('uncaughtException', (err) => {
-    console.error('There was an uncaught error', err);
+    console.error('Uncaught Exception occurred:', err);
 });
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
@@ -29,6 +29,9 @@ try {
             credential: admin.credential.cert(serviceAccount),
             databaseURL: process.env.FIREBASE_DB_URL
         });
+        console.log("Firebase initialized successfully.");
+    } else {
+        console.warn("Firebase credentials missing in environment variables.");
     }
 } catch (error) {
     console.error("Firebase Init Error:", error.message);
@@ -47,7 +50,10 @@ const chatBoxConfig = {
     }
 };
 
+// --- Page Routes ---
 app.get('/', (req, res) => { res.send('Bot is running...'); });
+app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'indexadmin.html')); });
+app.get('/reels', (req, res) => { res.sendFile(path.join(__dirname, 'reels.html')); });
 
 // --- Admin Panel API Routes ---
 app.get('/api/admin/data', async (req, res) => {
@@ -63,7 +69,6 @@ app.get('/api/admin/data', async (req, res) => {
 
         const settings = adminSnap.val() || {};
         
-        // সেটআপ স্ট্যাটস ডেটা
         settings.dailyUsers = dailySnap.numChildren() || 0;
         settings.monthlyUsers = monthlySnap.numChildren() || 0;
         settings.totalUsers = totalUsersSnap.numChildren() || 0;
@@ -77,55 +82,65 @@ app.get('/api/admin/data', async (req, res) => {
 });
 
 app.post('/api/admin/settings', async (req, res) => {
-    const { text, img } = req.body;
-    await db.ref('admin_settings').update({ welcomeText: text, welcomeImage: img });
-    res.json({ success: true });
+    try {
+        const { text, img } = req.body;
+        await db.ref('admin_settings').update({ welcomeText: text, welcomeImage: img });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/add-channel', async (req, res) => {
-    const { name, user } = req.body;
-    const snap = await db.ref('admin_settings/channels').once('value');
-    let channels = snap.val() || [];
-    channels.push({ name, user });
-    await db.ref('admin_settings/channels').set(channels);
-    res.json({ success: true });
+    try {
+        const { name, user } = req.body;
+        const snap = await db.ref('admin_settings/channels').once('value');
+        let channels = snap.val() || [];
+        channels.push({ name, user });
+        await db.ref('admin_settings/channels').set(channels);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/del-channel', async (req, res) => {
-    const { index } = req.body;
-    const snap = await db.ref('admin_settings/channels').once('value');
-    let channels = snap.val() || [];
-    channels.splice(index, 1);
-    await db.ref('admin_settings/channels').set(channels);
-    res.json({ success: true });
+    try {
+        const { index } = req.body;
+        const snap = await db.ref('admin_settings/channels').once('value');
+        let channels = snap.val() || [];
+        channels.splice(index, 1);
+        await db.ref('admin_settings/channels').set(channels);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- Ad Management API Routes ---
 app.post('/api/admin/save-ad', async (req, res) => {
-    const { index, text, link } = req.body;
-    const snap = await db.ref('admin_settings/ads').once('value');
-    let ads = snap.val() || [];
+    try {
+        const { index, text, link } = req.body;
+        const snap = await db.ref('admin_settings/ads').once('value');
+        let ads = snap.val() || [];
 
-    if (index !== undefined && index >= 0 && index < ads.length) {
-        ads[index] = { text, link }; // Edit existing ad
-    } else {
-        ads.push({ text, link }); // Add new ad
-    }
+        if (index !== undefined && index >= 0 && index < ads.length) {
+            ads[index] = { text, link }; 
+        } else {
+            ads.push({ text, link }); 
+        }
 
-    await db.ref('admin_settings/ads').set(ads);
-    res.json({ success: true });
+        await db.ref('admin_settings/ads').set(ads);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/del-ad', async (req, res) => {
-    const { index } = req.body;
-    const snap = await db.ref('admin_settings/ads').once('value');
-    let ads = snap.val() || [];
+    try {
+        const { index } = req.body;
+        const snap = await db.ref('admin_settings/ads').once('value');
+        let ads = snap.val() || [];
 
-    if (index !== undefined && index >= 0 && index < ads.length) {
-        ads.splice(index, 1);
-        await db.ref('admin_settings/ads').set(ads);
-    }
-    res.json({ success: true });
+        if (index !== undefined && index >= 0 && index < ads.length) {
+            ads.splice(index, 1);
+            await db.ref('admin_settings/ads').set(ads);
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- Broadcast API Route ---
@@ -133,7 +148,6 @@ app.post('/api/admin/broadcast', async (req, res) => {
     const { type, photoUrl, message, buttonsText } = req.body;
     
     try {
-        // ইনলাইন বাটন পার্সিং লজিক
         const inline_keyboard = [];
         if (buttonsText && buttonsText.trim()) {
             const lines = buttonsText.split('\n');
@@ -159,7 +173,6 @@ app.post('/api/admin/broadcast', async (req, res) => {
         let successCount = 0;
         let failCount = 0;
 
-        // রেট লিমিট হ্যান্ডল করার জন্য সামান্য ডিলেসহ লুপ
         for (const userId of users) {
             try {
                 if (type === 'photo' && photoUrl) {
@@ -171,12 +184,72 @@ app.post('/api/admin/broadcast', async (req, res) => {
             } catch (e) {
                 failCount++;
             }
-            await new Promise(resolve => setTimeout(resolve, 40)); // ৪০ মিলি-সেকেন্ড ডিলে
+            await new Promise(resolve => setTimeout(resolve, 40)); 
         }
 
         res.json({ success: true, successCount, failCount });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// --- Mini App Support Routes ---
+app.get('/api/videos', async (req, res) => {
+    try {
+        const snap = await db.ref('mini_app_videos').orderByChild('timestamp').once('value');
+        const data = snap.val() || {};
+        
+        const videoList = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key]
+        })).reverse();
+        
+        res.json(videoList);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/video/stream/:fileId', async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        const file = await bot.getFile(fileId);
+        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+
+        const response = await axios({
+            method: 'get',
+            url: fileUrl,
+            responseType: 'stream'
+        });
+
+        res.setHeader('Content-Type', response.headers['content-type'] || 'video/mp4');
+        if (response.headers['content-length']) {
+            res.setHeader('Content-Length', response.headers['content-length']);
+        }
+
+        response.data.pipe(res);
+    } catch (err) {
+        console.error("Streaming error:", err.message);
+        res.status(500).send("Error streaming video.");
+    }
+});
+
+app.post('/api/video/like', async (req, res) => {
+    const { videoId, isLiked } = req.body;
+    if (!videoId) return res.status(400).json({ error: "Missing videoId" });
+
+    try {
+        const likeRef = db.ref(`mini_app_videos/${videoId}/likes`);
+        await likeRef.transaction((currentLikes) => {
+            if (isLiked) {
+                return (currentLikes || 0) + 1;
+            } else {
+                return Math.max(0, (currentLikes || 1) - 1);
+            }
+        });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -206,6 +279,29 @@ async function getMissingChannels(userId) {
         return missing;
     } catch (e) { return []; }
 }
+
+// চ্যানেলে নতুন ভিডিও পোস্ট হওয়ার সাথে সাথে ডাটাবেসে সিঙ্ক
+bot.on('channel_post', async (msg) => {
+    if (msg.video) {
+        try {
+            const video = msg.video;
+            const fileId = video.file_id;
+            const caption = msg.caption || "";
+            const messageId = msg.message_id;
+
+            await db.ref(`mini_app_videos/${messageId}`).set({
+                fileId: fileId,
+                caption: caption,
+                likes: 0,
+                views: 0,
+                timestamp: admin.database.ServerValue.TIMESTAMP
+            });
+            console.log(`Video Synced: ${messageId}`);
+        } catch (err) {
+            console.error("Video sync error:", err.message);
+        }
+    }
+});
 
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -330,14 +426,14 @@ async function processDownload(chatId, url, msgId) {
                 message_id: loadingMsg.message_id
             }).catch(() => {});
 
-            // ডাউনলোড সংখ্যা বৃদ্ধির লজিক
+            // মোট ডাউনলোড সংখ্যা বৃদ্ধি
             await db.ref('stats/total_downloads').transaction((current) => (current || 0) + 1);
 
             const video = data.medias.find(m => m.type === 'video') || data.medias[0];
             const audio = data.medias.find(m => m.type === 'audio');
             if (audio) audioCache[chatId] = audio.url;
 
-            // অ্যাড রোটেশন লজিক
+            // ডায়নামিক অ্যাড রোটেশন প্রসেস
             let adTextCaption = "";
             try {
                 const adminSnap = await db.ref('admin_settings').once('value');
@@ -345,26 +441,25 @@ async function processDownload(chatId, url, msgId) {
                 const ads = settings.ads || [];
                 if (ads.length > 0) {
                     const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                    adTextCaption = `\n\nAd <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
+                    adTextCaption = `\n\nAd → <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
                 }
             } catch (adErr) {
-                console.error("Ad retrieval error:", adErr);
+                console.error("Ad append error:", adErr);
             }
 
-            // শেয়ার বাটন সেটআপ
+            // শেয়ার বাটন ইনফরমেশন
             const botInfo = await bot.getMe();
             const botUsername = botInfo.username;
             const shareText = encodeURIComponent(`SaveMe Bot ব্যবহার করে যেকোনো সোশ্যাল মিডিয়া ভিডিও সহজে ডাউনলোড করুন! 📥`);
             const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
 
-            // বাটন অ্যারে তৈরি
             const inlineKeyboardButtons = [];
             const actionRow = [];
 
             if (audio) {
                 actionRow.push({ text: "Audio 🎵", callback_data: "send_audio" });
             }
-            actionRow.push({ text: "Share to Friends 🔗", url: shareUrl });
+            actionRow.push({ text: "Share to Friends 💕", url: shareUrl });
             inlineKeyboardButtons.push(actionRow);
 
             const videoOpts = { 
@@ -390,5 +485,4 @@ async function processDownload(chatId, url, msgId) {
     }
 }
 
-app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'indexadmin.html')); });
 app.listen(PORT, () => { console.log(`Server started on port ${PORT}`); });
