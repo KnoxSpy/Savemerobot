@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>SaveMe Shorts</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Fullscreen scroll container */
+        .reels-container {
+            height: 100vh;
+            width: 100vw;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Individual Reel Section */
+        .reel {
+            position: relative;
+            height: 100vh;
+            width: 100vw;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Overlay Layout */
+        .overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 80px 20px 40px 20px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.85));
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        .video-details {
+            max-width: 75%;
+            color: #fff;
+            pointer-events: auto;
+        }
+
+        .video-details h3 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .video-details p {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Right Side Actions Panel */
+        .actions-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+            pointer-events: auto;
+            margin-bottom: 10px;
+        }
+
+        .action-button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+
+        .action-button:active {
+            transform: scale(0.9);
+        }
+
+        .action-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+            backdrop-filter: blur(5px);
+            transition: background 0.3s;
+        }
+
+        .action-button.liked .action-icon {
+            background: #e53e3e;
+            color: #fff;
+        }
+
+        .action-icon svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        /* Double Tap Heart Animation */
+        .heart-pop {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            color: #e53e3e;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        @keyframes heartPop {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        }
+
+        .pop-active {
+            animation: heartPop 0.8s ease-out forwards;
+        }
+
+        /* Loader */
+        .loading {
+            position: absolute;
+            font-size: 14px;
+            color: rgba(255,255,255,0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="reels-container" id="reelsContainer">
+        <!-- Videos will be injected dynamically here -->
+    </div>
+
+    <script>
+        let videos = [];
+        const container = document.getElementById('reelsContainer');
+
+        async function fetchVideos() {
+            try {
+                const res = await fetch('/api/videos');
+                videos = await res.json();
+                renderVideos();
+            } catch (err) {
+                console.error("Failed to load videos", err);
+            }
+        }
+
+        function renderVideos() {
+            if (videos.length === 0) {
+                container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100vh;">No videos available.</div>`;
+                return;
+            }
+
+            container.innerHTML = videos.map((video, index) => {
+                const streamUrl = `/api/video/stream/${encodeURIComponent(video.fileId)}`;
+                const isLiked = localStorage.getItem(`liked_${video.id}`) === 'true';
+
+                return `
+                    <div class="reel" id="reel-${video.id}" data-index="${index}">
+                        <div class="loading">Loading Video...</div>
+                        <video src="${streamUrl}" loop playsinline webkit-playsinline preload="metadata" onclick="togglePlay(this)"></video>
+                        
+                        <!-- Heart animation element on double tap -->
+                        <div class="heart-pop" id="heart-pop-${video.id}">
+                            <svg viewBox="0 0 24 24" width="80" height="80" fill="currentColor">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                        </div>
+
+                        <div class="overlay">
+                            <div class="video-details">
+                                <h3>@SaveMeShorts</h3>
+                                <p>${video.caption || "কোনো ক্যাপশন নেই।"}</p>
+                            </div>
+
+                            <div class="actions-panel">
+                                <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
+                                    <div class="action-icon">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                        </svg>
+                                    </div>
+                                    <span id="like-count-${video.id}">${video.likes || 0}</span>
+                                </button>
+
+                                <button class="action-button" onclick="shareVideo('${video.fileId}', event)">
+                                    <div class="action-icon">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                                        </svg>
+                                    </div>
+                                    <span>Share</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            setupIntersectionObserver();
+            setupDoubleTap();
+        }
+
+        // Play/Pause on single tap
+        function togglePlay(video) {
+            if (video.paused) {
+                video.play().catch(e => console.log("Play interrupted"));
+            } else {
+                video.pause();
+            }
+        }
+
+        // Like button toggle function
+        async function toggleLike(videoId, event) {
+            if (event) event.stopPropagation();
+            
+            const likeBtn = document.querySelector(`#reel-${videoId} .action-button`);
+            const likeCountSpan = document.getElementById(`like-count-${videoId}`);
+            const isLiked = likeBtn.classList.contains('liked');
+            let currentLikes = parseInt(likeCountSpan.innerText);
+
+            const newLikedState = !isLiked;
+            if (newLikedState) {
+                likeBtn.classList.add('liked');
+                likeCountSpan.innerText = currentLikes + 1;
+                localStorage.setItem(`liked_${videoId}`, 'true');
+            } else {
+                likeBtn.classList.remove('liked');
+                likeCountSpan.innerText = Math.max(0, currentLikes - 1);
+                localStorage.removeItem(`liked_${videoId}`);
+            }
+
+            // Sync with backend API
+            try {
+                await fetch('/api/video/like', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ videoId, isLiked: newLikedState })
+                });
+            } catch (err) {
+                console.error("Error updating like status", err);
+            }
+        }
+
+        // Share button function
+        function shareVideo(fileId, event) {
+            if (event) event.stopPropagation();
+            const shareText = "এই চমৎকার শর্টস ভিডিওটি দেখুন!";
+            const shareUrl = `https://t.me/share/url?url=${window.location.origin}/api/video/stream/${fileId}&text=${encodeURIComponent(shareText)}`;
+            window.open(shareUrl, '_blank');
+        }
+
+        // Active video handler (Intersection Observer)
+        function setupIntersectionObserver() {
+            const observerOptions = {
+                root: container,
+                threshold: 0.6
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const video = entry.target.querySelector('video');
+                    const loadingText = entry.target.querySelector('.loading');
+
+                    if (video) {
+                        if (entry.isIntersecting) {
+                            video.play().then(() => {
+                                if (loadingText) loadingText.style.display = 'none';
+                            }).catch(err => {
+                                // Handles autoplay block
+                                console.log("User interaction required to start audio");
+                            });
+                        } else {
+                            video.pause();
+                            video.currentTime = 0;
+                        }
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.reel').forEach(reel => observer.observe(reel));
+        }
+
+        // Double tap to like mechanism
+        function setupDoubleTap() {
+            document.querySelectorAll('.reel').forEach(reel => {
+                let lastTap = 0;
+                reel.addEventListener('click', function(e) {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    if (tapLength < 300 && tapLength > 0) {
+                        const videoId = reel.id.replace('reel-', '');
+                        
+                        // Show popping heart animation
+                        const heartPop = document.getElementById(`heart-pop-${videoId}`);
+                        heartPop.classList.add('pop-active');
+                        setTimeout(() => heartPop.classList.remove('pop-active'), 800);
+
+                        // Trigger like if not already liked
+                        const likeBtn = reel.querySelector('.action-button');
+                        if (!likeBtn.classList.contains('liked')) {
+                            toggleLike(videoId);
+                        }
+                    }
+                    lastTap = currentTime;
+                });
+            });
+        }
+
+        fetchVideos();
+    </script>
+</body>
+</html>
