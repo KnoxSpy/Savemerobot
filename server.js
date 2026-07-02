@@ -53,10 +53,25 @@ app.get('/', (req, res) => { res.send('Bot is running...'); });
 app.get('/api/admin/data', async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM Format
+
         const adminSnap = await db.ref('admin_settings').once('value');
-        const statsSnap = await db.ref(`daily_stats/${today}`).once('value');
+        const dailySnap = await db.ref(`daily_stats/${today}`).once('value');
+        const monthlySnap = await db.ref(`monthly_stats/${currentMonth}`).once('value');
+        const totalUsersSnap = await db.ref('all_users').once('value');
+        const downloadsSnap = await db.ref('stats/total_downloads').once('value');
+
         const settings = adminSnap.val() || {};
-        settings.dailyUsers = statsSnap.numChildren() || 0;
+        
+        // সেটআপ স্ট্যাটস ডেটা
+        settings.dailyUsers = dailySnap.numChildren() || 0;
+        settings.monthlyUsers = monthlySnap.numChildren() || 0;
+        settings.totalUsers = totalUsersSnap.numChildren() || 0;
+        settings.totalDownloads = downloadsSnap.val() || 0;
+
+        if (!settings.channels) settings.channels = [];
+        if (!settings.ads) settings.ads = [];
+
         res.json(settings);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -85,11 +100,94 @@ app.post('/api/admin/del-channel', async (req, res) => {
     res.json({ success: true });
 });
 
+// --- Ad Management API Routes ---
+app.post('/api/admin/save-ad', async (req, res) => {
+    const { index, text, link } = req.body;
+    const snap = await db.ref('admin_settings/ads').once('value');
+    let ads = snap.val() || [];
+
+    if (index !== undefined && index >= 0 && index < ads.length) {
+        ads[index] = { text, link }; // Edit existing ad
+    } else {
+        ads.push({ text, link }); // Add new ad
+    }
+
+    await db.ref('admin_settings/ads').set(ads);
+    res.json({ success: true });
+});
+
+app.post('/api/admin/del-ad', async (req, res) => {
+    const { index } = req.body;
+    const snap = await db.ref('admin_settings/ads').once('value');
+    let ads = snap.val() || [];
+
+    if (index !== undefined && index >= 0 && index < ads.length) {
+        ads.splice(index, 1);
+        await db.ref('admin_settings/ads').set(ads);
+    }
+    res.json({ success: true });
+});
+
+// --- Broadcast API Route ---
+app.post('/api/admin/broadcast', async (req, res) => {
+    const { type, photoUrl, message, buttonsText } = req.body;
+    
+    try {
+        // ইনলাইন বাটন পার্সিং লজিক
+        const inline_keyboard = [];
+        if (buttonsText && buttonsText.trim()) {
+            const lines = buttonsText.split('\n');
+            lines.forEach(line => {
+                const parts = line.split('|');
+                if (parts.length === 2) {
+                    inline_keyboard.push([{
+                        text: parts[0].trim(),
+                        url: parts[1].trim()
+                    }]);
+                }
+            });
+        }
+
+        const options = {
+            parse_mode: 'HTML',
+            reply_markup: inline_keyboard.length > 0 ? { inline_keyboard } : undefined
+        };
+
+        const usersSnap = await db.ref('all_users').once('value');
+        const users = usersSnap.val() ? Object.keys(usersSnap.val()) : [];
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // রেট লিমিট হ্যান্ডল করার জন্য সামান্য ডিলেসহ লুপ
+        for (const userId of users) {
+            try {
+                if (type === 'photo' && photoUrl) {
+                    await bot.sendPhoto(userId, photoUrl, { ...options, caption: message });
+                } else {
+                    await bot.sendMessage(userId, message, options);
+                }
+                successCount++;
+            } catch (e) {
+                failCount++;
+            }
+            await new Promise(resolve => setTimeout(resolve, 40)); // ৪০ মিলি-সেকেন্ড ডিলে
+        }
+
+        res.json({ success: true, successCount, failCount });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // --- Bot Logic ---
 async function trackUser(chatId) {
     const today = new Date().toISOString().split('T')[0];
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    
     await db.ref(`all_users/${chatId}`).set(true);
     await db.ref(`daily_stats/${today}/${chatId}`).set(true);
+    await db.ref(`monthly_stats/${currentMonth}/${chatId}`).set(true);
 }
 
 async function getMissingChannels(userId) {
@@ -116,7 +214,6 @@ bot.on('message', async (msg) => {
 
     await trackUser(chatId).catch(() => {});
 
-    // ১. বাটনে ক্লিক করলে বা /start দিলে স্বাগতম জানাবে
     if (text === '/start' || text === '🤖 SnapSavingBot') {
         try {
             const snap = await db.ref('admin_settings').once('value');
@@ -146,7 +243,6 @@ bot.on('message', async (msg) => {
         if (missingChannels.length > 0) {
             userSessions[chatId] = text;
             
-            // ২. চ্যানেল বাটনগুলো প্রতি লাইনে ২টা করে সাজানো
             const buttons = [];
             for (let i = 0; i < missingChannels.length; i += 2) {
                 const row = missingChannels.slice(i, i + 2).map(c => ({
@@ -155,7 +251,6 @@ bot.on('message', async (msg) => {
                 }));
                 buttons.push(row);
             }
-            // ভেরিফাই বাটনটি শেষে আলাদা লাইনে থাকবে
             buttons.push([{ text: "✅ Verify", callback_data: "verify_join" }]);
 
             return bot.sendMessage(chatId, "⚠️ **You must join our channels to use this bot!**", {
@@ -188,7 +283,6 @@ bot.on('callback_query', async (q) => {
     }
 });
 
-// --- এনিমেশন ফাংশন ---
 function getProgressBar(percent) {
     const totalBars = 10;
     const filledBars = Math.round((percent / 100) * totalBars);
@@ -197,7 +291,6 @@ function getProgressBar(percent) {
 }
 
 async function processDownload(chatId, url, msgId) {
-    // ৩. Reaction দেওয়া
     if (msgId) {
         try {
             await bot._request('setMessageReaction', {
@@ -237,20 +330,53 @@ async function processDownload(chatId, url, msgId) {
                 message_id: loadingMsg.message_id
             }).catch(() => {});
 
+            // ডাউনলোড সংখ্যা বৃদ্ধির লজিক
+            await db.ref('stats/total_downloads').transaction((current) => (current || 0) + 1);
+
             const video = data.medias.find(m => m.type === 'video') || data.medias[0];
             const audio = data.medias.find(m => m.type === 'audio');
             if (audio) audioCache[chatId] = audio.url;
 
+            // অ্যাড রোটেশন লজিক
+            let adTextCaption = "";
+            try {
+                const adminSnap = await db.ref('admin_settings').once('value');
+                const settings = adminSnap.val() || {};
+                const ads = settings.ads || [];
+                if (ads.length > 0) {
+                    const randomAd = ads[Math.floor(Math.random() * ads.length)];
+                    adTextCaption = `\n\n🎯 <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
+                }
+            } catch (adErr) {
+                console.error("Ad retrieval error:", adErr);
+            }
+
+            // শেয়ার বাটন সেটআপ
+            const botInfo = await bot.getMe();
+            const botUsername = botInfo.username;
+            const shareText = encodeURIComponent(`SaveMe Bot ব্যবহার করে যেকোনো সোশ্যাল মিডিয়া ভিডিও সহজে ডাউনলোড করুন! 📥`);
+            const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
+
+            // বাটন অ্যারে তৈরি
+            const inlineKeyboardButtons = [];
+            const actionRow = [];
+
+            if (audio) {
+                actionRow.push({ text: "Audio 🎵", callback_data: "send_audio" });
+            }
+            actionRow.push({ text: "Share to Friends 💕", url: shareUrl });
+            inlineKeyboardButtons.push(actionRow);
+
             const videoOpts = { 
-                caption: `Use This - @SnapSavingBot`,
+                caption: `Use This - @SnapSavingBot` + adTextCaption,
+                parse_mode: 'HTML',
                 reply_markup: {
-                    inline_keyboard: audio ? [[{ text: "Audio 🎵", callback_data: "send_audio" }]] : []
+                    inline_keyboard: inlineKeyboardButtons
                 }
             };
 
             await bot.sendVideo(chatId, video.url, videoOpts);
             
-            // সব শেষে লোডিং মেসেজ ডিলিট করা
             setTimeout(() => {
                 bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             }, 1000);
