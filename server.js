@@ -20,7 +20,8 @@ app.use(bodyParser.json());
 
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const TARGET_CHANNEL = '@reelsuploder'; // আপনার চ্যানেলের ইউজারনেম
+const TARGET_CHANNEL = '@reelsuploder'; // টার্গেট চ্যানেল
+const ADMIN_ID = '7304915019'; // অ্যাডমিন আইডি
 
 // --- Firebase Initialization ---
 try {
@@ -194,7 +195,7 @@ app.post('/api/admin/broadcast', async (req, res) => {
 
 // --- Mini App API Routes (Optimized) ---
 
-// ১. ফাইল সাইজ অনুযায়ী ভিডিও সর্ট করার লজিক (ছোট ভিডিও আগে লোড হবে)
+// ফাইল সাইজ অনুযায়ী ভিডিও সর্ট করার লজিক (ছোট ভিডিও আগে লোড হবে)
 app.get('/api/videos', async (req, res) => {
     try {
         const snap = await db.ref('mini_app_videos').once('value');
@@ -203,7 +204,7 @@ app.get('/api/videos', async (req, res) => {
         const videoList = Object.keys(data).map(key => ({
             id: key,
             ...data[key]
-        })).sort((a, b) => (a.fileSize || 0) - (b.fileSize || 0)); // ছোট ফাইল সাইজ আগে আসবে
+        })).sort((a, b) => (a.fileSize || 0) - (b.fileSize || 0)); 
         
         res.json(videoList);
     } catch (e) {
@@ -211,7 +212,7 @@ app.get('/api/videos', async (req, res) => {
     }
 });
 
-// ২. আল্ট্রা-ফাস্ট ভিডিও স্ট্রিমিং (HTTP 206 Range Request সাপোর্টসহ)
+// আল্ট্রা-ফাস্ট ভিডিও স্ট্রিমিং (HTTP 206 Range Request সাপোর্টসহ)
 app.get('/api/video/stream/:fileId', async (req, res) => {
     try {
         const { fileId } = req.params;
@@ -297,7 +298,7 @@ async function getMissingChannels(userId) {
     } catch (e) { return []; }
 }
 
-// @reelsuploder চ্যানেল থেকে ভিডিও অটো সিঙ্ক এবং লাইক লজিক
+// @reelsuploder চ্যানেল থেকে ভিডিও অটো সিঙ্ক, লাইক এবং অ্যাডমিন অ্যালার্ট সিস্টেম
 bot.on('channel_post', async (msg) => {
     const targetChannel = 'reelsuploder';
 
@@ -306,10 +307,11 @@ bot.on('channel_post', async (msg) => {
             try {
                 const video = msg.video;
                 const fileId = video.file_id;
-                const fileSize = video.file_size || 0; // সর্টিং করার জন্য ফাইল সাইজ নেওয়া হলো
+                const fileSize = video.file_size || 0; 
                 const caption = msg.caption || "";
                 const messageId = msg.message_id;
 
+                // ডাটাবেসে ভিডিও তথ্য সংরক্ষণ
                 await db.ref(`mini_app_videos/${messageId}`).set({
                     fileId: fileId,
                     fileSize: fileSize,
@@ -320,6 +322,7 @@ bot.on('channel_post', async (msg) => {
                 });
                 console.log(`Video synced from @${targetChannel}: ${messageId}`);
 
+                // চ্যানেলের পোস্টে লাইক রিঅ্যাকশন প্রদান
                 try {
                     await bot._request('setMessageReaction', {
                         chat_id: msg.chat.id,
@@ -330,6 +333,23 @@ bot.on('channel_post', async (msg) => {
                     console.error("Could not set reaction:", reactErr.message);
                 }
 
+                // অ্যাডমিন নোটিফিকেশন মেসেজ প্রেরণ (রিমুভ বাটনসহ)
+                try {
+                    const postLink = `https://t.me/${targetChannel}/${messageId}`;
+                    const adminMsg = `📹 <b>নতুন ভিডিও সিঙ্ক হয়েছে!</b>\n\n🔗 <b>চ্যানেল পোস্ট লিঙ্ক:</b> <a href="${postLink}">ভিডিওটি দেখুন</a>\n💬 <b>ক্যাপশন:</b> ${caption || "নেই"}`;
+                    
+                    await bot.sendMessage(ADMIN_ID, adminMsg, {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: "❌ Remove Video from Server", callback_data: `remove_vid_${messageId}` }]
+                            ]
+                        }
+                    });
+                } catch (adminErr) {
+                    console.error("Admin notification failed:", adminErr.message);
+                }
+
             } catch (err) {
                 console.error("Video sync error:", err.message);
             }
@@ -337,7 +357,7 @@ bot.on('channel_post', async (msg) => {
     }
 });
 
-// ৩. চ্যানেল থেকে ভিডিও রিমুভ করলে অ্যাপ থেকেও অটো-ডিলিট করার ব্যাকগ্রাউন্ড টাস্ক
+// চ্যানেল থেকে ডিলিট হওয়া ভিডিও ডাটাবেস থেকে রিমুভ করার ব্যাকগ্রাউন্ড টাস্ক
 async function cleanupDeletedVideos() {
     try {
         const snap = await db.ref('mini_app_videos').once('value');
@@ -346,25 +366,22 @@ async function cleanupDeletedVideos() {
         for (const messageId of Object.keys(data)) {
             const video = data[messageId];
             try {
-                // সাইলেন্টলি এডিট রিকোয়েস্ট পাঠিয়ে যাচাই করা হচ্ছে মেসেজটি চ্যানেলে আছে কি না
                 await bot.editMessageCaption(video.caption || "", {
                     chat_id: TARGET_CHANNEL,
                     message_id: parseInt(messageId)
                 });
             } catch (err) {
-                // মেসেজটি ডিলিট হয়ে থাকলে ডাটাবেস থেকেও মুছে ফেলা হবে
                 if (err.message.includes("message to edit not found") || err.message.includes("message can't be edited")) {
                     await db.ref(`mini_app_videos/${messageId}`).remove();
-                    console.log(`Successfully removed deleted video from app database: ${messageId}`);
+                    console.log(`Removed deleted video: ${messageId}`);
                 }
             }
-            await new Promise(resolve => setTimeout(resolve, 500)); // ৪২৯ রেট লিমিট এড়াতে ডিলে
+            await new Promise(resolve => setTimeout(resolve, 500)); 
         }
     } catch (e) {
         console.error("Cleanup error:", e.message);
     }
 }
-// প্রতি ৫ মিনিট পরপর অটোমেটিক ক্লিনিং প্রসেস চলবে
 setInterval(cleanupDeletedVideos, 5 * 60 * 1000);
 
 bot.on('message', async (msg) => {
@@ -424,7 +441,35 @@ bot.on('message', async (msg) => {
 
 bot.on('callback_query', async (q) => {
     const chatId = q.message.chat.id;
-    if (q.data === "verify_join") {
+    const callbackData = q.data;
+
+    // ১. অ্যাডমিন কর্তৃক ভিডিও রিমুভ করার রিকোয়েস্ট প্রসেস
+    if (callbackData.startsWith("remove_vid_")) {
+        if (q.from.id.toString() !== ADMIN_ID) {
+            return bot.answerCallbackQuery(q.id, { text: "❌ আপনি এই ভিডিও রিমুভ করার জন্য অনুমোদিত নন!", show_alert: true });
+        }
+        
+        const messageId = callbackData.replace("remove_vid_", "");
+        try {
+            // ডাটাবেস থেকে ভিডিও রিমুভ করা হচ্ছে
+            await db.ref(`mini_app_videos/${messageId}`).remove();
+            
+            // অ্যাডমিন নোটিফিকেশন মেসেজ আপডেট
+            await bot.editMessageText(`✅ <b>ভিডিওটি সার্ভার এবং মিনি অ্যাপ থেকে সফলভাবে রিমুভ করা হয়েছে!</b>\n\n🆔 Message ID: ${messageId}`, {
+                chat_id: q.message.chat.id,
+                message_id: q.message.message_id,
+                parse_mode: 'HTML'
+            });
+            
+            await bot.answerCallbackQuery(q.id, { text: "Removed successfully!", show_alert: false });
+        } catch (err) {
+            console.error("Failed to remove video:", err.message);
+            await bot.answerCallbackQuery(q.id, { text: "Error while deleting video.", show_alert: true });
+        }
+        return;
+    }
+
+    if (callbackData === "verify_join") {
         const missingChannels = await getMissingChannels(chatId);
         if (missingChannels.length === 0) {
             await bot.deleteMessage(chatId, q.message.message_id).catch(() => {});
@@ -434,7 +479,7 @@ bot.on('callback_query', async (q) => {
             bot.answerCallbackQuery(q.id, { text: "❌ You haven't joined all channels yet!", show_alert: true });
         }
     }
-    if (q.data === "send_audio") {
+    if (callbackData === "send_audio") {
         const audioUrl = audioCache[chatId];
         if (audioUrl) {
             bot.answerCallbackQuery(q.id, { text: "Sending Audio..." });
@@ -503,7 +548,7 @@ async function processDownload(chatId, url, msgId) {
                 const ads = settings.ads || [];
                 if (ads.length > 0) {
                     const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                    adTextCaption = `\n\nAd → <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
+                    adTextCaption = `\n\nAds → <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
                 }
             } catch (adErr) {
                 console.error("Ad append error:", adErr);
@@ -511,7 +556,7 @@ async function processDownload(chatId, url, msgId) {
 
             const botInfo = await bot.getMe();
             const botUsername = botInfo.username;
-            const shareText = encodeURIComponent(`SaveMe Bot ব্যবহার করে যেকোনো সোশ্যাল মিডিয়া ভিডিও সহজে ডাউনলোড করুন! 📥`);
+            const shareText = encodeURIComponent(`SnapSavingBot ব্যবহার করে যেকোনো সোশ্যাল মিডিয়া ভিডিও সহজে ডাউনলোড করুন! 📥`);
             const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
 
             const inlineKeyboardButtons = [];
