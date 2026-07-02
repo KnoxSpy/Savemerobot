@@ -345,7 +345,7 @@ async function processDownload(chatId, url, msgId) {
                 const ads = settings.ads || [];
                 if (ads.length > 0) {
                     const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                    adTextCaption = `\n\n🎯 <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
+                    adTextCaption = `\n\nAd <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
                 }
             } catch (adErr) {
                 console.error("Ad retrieval error:", adErr);
@@ -364,7 +364,7 @@ async function processDownload(chatId, url, msgId) {
             if (audio) {
                 actionRow.push({ text: "Audio 🎵", callback_data: "send_audio" });
             }
-            actionRow.push({ text: "Share to Friends 💕", url: shareUrl });
+            actionRow.push({ text: "Share to Friends 🔗", url: shareUrl });
             inlineKeyboardButtons.push(actionRow);
 
             const videoOpts = { 
