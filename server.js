@@ -36,7 +36,8 @@ const strings = {
         join_ch: "📢 চ্যানেলে জয়েন করুন",
         join_gr: "👥 গ্রুপে জয়েন করুন",
         add_gr: "➕ গ্রুপে বট যুক্ত করুন",
-        lang_btn: "🇬🇧 English এ পরিবর্তন করুন"
+        lang_btn: "🇬🇧 English এ পরিবর্তন করুন",
+        lang_switched: "ভাষা পরিবর্তন করে বাংলা করা হয়েছে।"
     },
     en: {
         welcome: "Welcome! Send me a link to download videos.",
@@ -49,7 +50,8 @@ const strings = {
         join_ch: "📢 Join Channel",
         join_gr: "👥 Join Group",
         add_gr: "➕ Add Bot to Group",
-        lang_btn: "🇧🇩 Change to বাংলা"
+        lang_btn: "🇧🇩 Change to বাংলা",
+        lang_switched: "Language has been changed to English."
     }
 };
 
@@ -72,9 +74,10 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const userSessions = {}; 
 const audioCache = {}; 
 
+// ভাষা পরিবর্তনের ডাইনামিক কিবোর্ড বাটন কনফিগারেশন
 const chatBoxConfig = {
     reply_markup: {
-        keyboard: [[{ text: "🤖 SnapSavingBot" }]],
+        keyboard: [[{ text: "🇧🇩 বাংলা / 🇬🇧 English" }]],
         resize_keyboard: true,
         input_field_placeholder: "Send me links"
     }
@@ -82,7 +85,7 @@ const chatBoxConfig = {
 
 // --- Helper Functions ---
 
-// ইউজারের প্রোফাইল পিকচার এবং নাম ডায়নামিকালি রিট্রিভ করার হেল্পার ফাংশন
+// ডায়নামিক প্রোফাইল পিকচার এবং নাম রিট্রিভ করার হেল্পার ফাংশন
 async function getUserProfileInfo(userId) {
     try {
         const chat = await bot.getChat(userId);
@@ -99,13 +102,13 @@ async function getUserProfileInfo(userId) {
     }
 }
 
-// ইন-অ্যাপ নোটিফিকেশন পাঠানোর মেকানিজম (যদি নোটিফিকেশন অন থাকে)
+// ইন-অ্যাপ নোটিফিকেশন পাঠানোর মেকানিজম
 async function sendNotification(uploaderId, message) {
-    if (!uploaderId || uploaderId.startsWith('-100')) return; // চ্যাট আইডি চ্যানেল হলে স্কিপ করবে
+    if (!uploaderId || uploaderId.startsWith('-100')) return;
     try {
         const settingsSnap = await db.ref(`users/${uploaderId}/settings`).once('value');
         const settings = settingsSnap.val() || {};
-        const notificationsEnabled = settings.notifications !== false; // ডিফল্ট অন
+        const notificationsEnabled = settings.notifications !== false;
 
         if (notificationsEnabled) {
             await bot.sendMessage(uploaderId, message, { parse_mode: 'HTML' });
@@ -258,9 +261,20 @@ app.post('/api/admin/broadcast', async (req, res) => {
     }
 });
 
-// --- Mini App API Routes (Updated) ---
+// --- Mini App API Routes (Updated with dynamic filters and Language Sync) ---
 
-// পোস্ট মেথড ব্যবহার করে দেখা শেষ হওয়া ভিডিওগুলোকে বাদ দিয়ে ফিড রিসেট করা ও নতুন র্যান্ডমাইজেশন
+// ইউজারের ভাষা পরিবর্তনের তথ্য অ্যাপে পাঠানোর এন্ডপয়েন্ট
+app.get('/api/user/lang', async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
+    try {
+        const lang = await getUserLang(userId);
+        res.json({ lang });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/videos', async (req, res) => {
     try {
         const { seenVideos } = req.body;
@@ -275,16 +289,13 @@ app.post('/api/videos', async (req, res) => {
         let wasReset = false;
         const seenSet = new Set(seenVideos || []);
 
-        // অদেখা ভিডিওগুলো ফিল্টার করা
         let filteredList = videoList.filter(video => !seenSet.has(video.id));
 
-        // সব ভিডিও দেখা হয়ে গেলে ফিড পুনরায় খালি ও রিসেট করা
         if (filteredList.length === 0 && videoList.length > 0) {
             filteredList = videoList;
             wasReset = true;
         }
 
-        // প্রতিবার পেজ ওপেন বা রিলোড করলে ভিডিও সাজানোর তালিকা র্যান্ডমাইজ করা
         filteredList.sort(() => Math.random() - 0.5);
         
         res.json({
@@ -296,7 +307,6 @@ app.post('/api/videos', async (req, res) => {
     }
 });
 
-// পূর্বের এপিআই কম্প্যাটিবিলিটির জন্য GET মেথড সচল রাখা হয়েছে
 app.get('/api/videos', async (req, res) => {
     try {
         const snap = await db.ref('mini_app_videos').once('value');
@@ -314,7 +324,6 @@ app.get('/api/videos', async (req, res) => {
     }
 });
 
-// আল্ট্রা-ফাস্ট ভিডিও স্ট্রিমিং (HTTP 206 Range Request সাপোর্টসহ)
 app.get('/api/video/stream/:fileId', async (req, res) => {
     try {
         const { fileId } = req.params;
@@ -336,7 +345,6 @@ app.get('/api/video/stream/:fileId', async (req, res) => {
         res.writeHead(response.status, response.headers);
         response.data.pipe(res);
     } catch (err) {
-        console.error("Streaming error:", err.message);
         res.status(500).send("Error streaming video.");
     }
 });
@@ -360,7 +368,6 @@ app.post('/api/video/like', async (req, res) => {
             }
         });
 
-        // লাইক পড়লে আপলোডারকে বটের মাধ্যমে নোটিফিকেশন প্রেরণ
         if (isLiked && video.uploaderId && video.uploaderId !== userId) {
             const likerName = username ? `@${username}` : "কেউ একজন";
             await sendNotification(video.uploaderId, `❤️ <b>${likerName}</b> আপনার রিল ভিডিওটি লাইক করেছেন!`);
@@ -385,7 +392,6 @@ app.post('/api/video/view', async (req, res) => {
 
         await videoRef.child('views').transaction((currentViews) => (currentViews || 0) + 1);
 
-        // ভিউ পড়লে আপলোডারকে বটের মাধ্যমে নোটিফিকেশন প্রেরণ
         if (video.uploaderId && video.uploaderId !== userId) {
             await sendNotification(video.uploaderId, `👁️ কেউ একজন আপনার রিল ভিডিওটি দেখেছেন!`);
         }
@@ -396,7 +402,6 @@ app.post('/api/video/view', async (req, res) => {
     }
 });
 
-// ভিডিও সেভ অপশন ও আপলোডার নোটিফিকেশন সিস্টেম
 app.post('/api/video/save', async (req, res) => {
     const { videoId, userId, isSaved } = req.body;
     if (!videoId || !userId) return res.status(400).json({ error: "Missing parameters" });
@@ -413,9 +418,8 @@ app.post('/api/video/save', async (req, res) => {
                 parse_mode: 'HTML'
             });
 
-            // সেভ করার পর আপলোডারকে নোটিফাই করা
             if (video.uploaderId && video.uploaderId !== userId) {
-                await sendNotification(video.uploaderId, `💾 কেউ একজন আপনার রিল ভিডিওটি তার বটের চ্যাটে সেভ করেছেন!`);
+                await sendNotification(video.uploaderId, `💾 কেউ একজন আপনার রিল ভিডিওটি চ্যাটে সেভ করেছেন!`);
             }
         }
         res.json({ success: true });
@@ -424,7 +428,6 @@ app.post('/api/video/save', async (req, res) => {
     }
 });
 
-// ভিডিও রিপোর্টিং এবং এডমিন প্যানেল রিমুভ অ্যালার্ট সিস্টেম
 app.post('/api/video/report', async (req, res) => {
     const { videoId, userId, username } = req.body;
     if (!videoId) return res.status(400).json({ error: "Missing parameters" });
@@ -455,7 +458,6 @@ app.post('/api/video/report', async (req, res) => {
     }
 });
 
-// ইউজার সেটিংস এপিআই এন্ডপয়েন্ট (রিল আপলোডিং অন/অফ এবং নোটিফিকেশন সেটিংস)
 app.get('/api/user/settings', async (req, res) => {
     const { userId } = req.query;
     if (!userId) return res.status(400).json({ error: "Missing userId" });
@@ -487,7 +489,7 @@ app.post('/api/user/settings', async (req, res) => {
 // --- Bot Language Helper ---
 async function getUserLang(chatId) {
     const snap = await db.ref(`users/${chatId}/lang`).once('value');
-    return snap.val() || 'bn'; // Default language is Bangla
+    return snap.val() || 'bn'; 
 }
 
 // --- Bot Logic ---
@@ -534,7 +536,7 @@ bot.on('channel_post', async (msg) => {
                 let uploaderName = `@${msg.chat.username}` || msg.chat.title || "Reels Uploader";
                 let uploaderPic = "https://via.placeholder.com/150";
 
-                // ক্যাপশন থেকে হিডেন মেটাডাটা এক্সট্রাক্ট করে ইউজার প্রোফাইল নির্ধারণ
+                // ক্যাপশন থেকে হিডেন মেটাডাটা এক্সট্রাক্ট করে ইউজার প্রোফাইল পিকচার টেলিগ্রাম থেকে অটো নিয়ে নেওয়া হচ্ছে
                 const uidMatch = caption.match(/_uid_(\d+)_/);
                 if (uidMatch) {
                     const extractedUserId = uidMatch[1];
@@ -543,15 +545,15 @@ bot.on('channel_post', async (msg) => {
                     uploaderName = profile.name;
                     uploaderPic = profile.photoUrl;
                 } else {
+                    // ফরওয়ার্ড বা ডিরেক্ট চ্যানেলে ফাইল আপলোডের ক্ষেত্রে Reelsuploader লোগো টেলিগ্রাম থেকে অটো নিয়ে নিবে
                     const channelProfile = await getUserProfileInfo(msg.chat.id);
                     uploaderPic = channelProfile.photoUrl;
                 }
 
-                // ডাটাবেসে ভিডিও এবং ইউজারের তথ্য সংরক্ষণ
                 await db.ref(`mini_app_videos/${messageId}`).set({
                     fileId: fileId,
                     fileSize: fileSize,
-                    caption: caption.replace(/_uid_\d+_/g, '').trim(), // মেটাডাটা ফিল্টার করে রিয়েল ক্যাপশন স্টোর করা হচ্ছে
+                    caption: caption.replace(/_uid_\d+_/g, '').trim(), 
                     likes: 0,
                     views: 0,
                     uploaderId: uploaderId,
@@ -561,7 +563,6 @@ bot.on('channel_post', async (msg) => {
                 });
                 console.log(`Video synced from @${targetChannel}: ${messageId}`);
 
-                // চ্যানেলের পোস্টে লাইক রিঅ্যাকশন প্রদান
                 try {
                     await bot._request('setMessageReaction', {
                         chat_id: msg.chat.id,
@@ -572,7 +573,6 @@ bot.on('channel_post', async (msg) => {
                     console.error("Could not set reaction:", reactErr.message);
                 }
 
-                // অ্যাডমিন নোটিফিকেশন মেসেজ প্রেরণ (রিমুভ বাটনসহ)
                 try {
                     const postLink = `https://t.me/${targetChannel}/${messageId}`;
                     const adminMsg = `📹 <b>নতুন ভিডিও সিঙ্ক হয়েছে!</b>\n\n🔗 <b>চ্যানেল পোস্ট লিঙ্ক:</b> <a href="${postLink}">ভিডিওটি দেখুন</a>\n💬 <b>ক্যাপশন:</b> ${caption || "নেই"}`;
@@ -603,7 +603,16 @@ bot.on('message', async (msg) => {
 
     await trackUser(chatId).catch(() => {});
 
-    if (text === '/start' || text === '🤖 SnapSavingBot') {
+    // কিবোর্ড মেনু বাটন থেকে ভাষা টগল করা এবং অ্যাপের সাথে সিঙ্ক করা
+    if (text === "🇧🇩 বাংলা / 🇬🇧 English") {
+        const currentLang = await getUserLang(chatId);
+        const newLang = currentLang === 'bn' ? 'en' : 'bn';
+        await db.ref(`users/${chatId}/lang`).set(newLang);
+        const str = strings[newLang];
+        return bot.sendMessage(chatId, str.lang_switched, chatBoxConfig);
+    }
+
+    if (text === '/start') {
         try {
             const lang = await getUserLang(chatId);
             const str = strings[lang];
@@ -626,9 +635,7 @@ bot.on('message', async (msg) => {
                         ],
                         [{ text: str.add_gr, url: `https://t.me/${botUsername}?startgroup=true` }],
                         [{ text: str.lang_btn, callback_data: lang === 'bn' ? 'setlang_en' : 'setlang_bn' }]
-                    ],
-                    keyboard: [[{ text: "🤖 SnapSavingBot" }]],
-                    resize_keyboard: true
+                    ]
                 }
             });
         } catch (e) { console.error(e); }
@@ -667,7 +674,7 @@ bot.on('callback_query', async (q) => {
     const lang = await getUserLang(chatId);
     const str = strings[lang];
 
-    // ভাষা পরিবর্তন করার লজিক (বাংলা এবং ইংরেজি)
+    // ইনলাইন বাটন থেকে ভাষা সিঙ্ক করার লজিক
     if (callbackData === "setlang_bn" || callbackData === "setlang_en") {
         const newLang = callbackData === "setlang_bn" ? 'bn' : 'en';
         await db.ref(`users/${chatId}/lang`).set(newLang);
@@ -699,7 +706,6 @@ bot.on('callback_query', async (q) => {
         return;
     }
 
-    // অ্যাডমিন বা রিপোর্ট প্যানেল থেকে ভিডিও রিমুভ করার রিকোয়েস্ট প্রসেস
     if (callbackData.startsWith("remove_vid_")) {
         if (q.from.id.toString() !== ADMIN_ID) {
             return bot.answerCallbackQuery(q.id, { text: "❌ আপনি এই ভিডিও রিমুভ করার জন্য অনুমোদিত নন!", show_alert: true });
@@ -709,7 +715,7 @@ bot.on('callback_query', async (q) => {
         try {
             await db.ref(`mini_app_videos/${messageId}`).remove();
             
-            await bot.editMessageText(`✅ <b>ভিডিওটি সার্ভার এবং মিনি অ্যাপ থেকে সফলভাবে রিমুভ করা হয়েছে!</b>\n\n🆔 Message ID: ${messageId}`, {
+            await bot.editMessageText(q.message.text ? `✅ <b>ভিডিওটি রিমুভ করা হয়েছে!</b>` : `✅ <b>ভিডিওটি রিমুভ করা হয়েছে!</b>`, {
                 chat_id: q.message.chat.id,
                 message_id: q.message.message_id,
                 parse_mode: 'HTML'
@@ -835,15 +841,14 @@ async function processDownload(chatId, url, msgId) {
 
             await bot.sendVideo(chatId, video.url, videoOpts);
 
-            // "Start Uploading Reels" অন থাকলে ভিডিও স্বয়ংক্রিয়ভাবে বটের চ্যানেলে আপলোড হবে
+            // "Start Uploading Reels" অপশন অন থাকলে তার ভিডিও তার প্রোফাইল ফোটো ও মেটাডাটা সহ স্বয়ংক্রিয়ভাবে আপলোড হবে
             try {
                 const userSettingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
                 const settings = userSettingsSnap.val() || {};
-                const uploadingReels = settings.uploadingReels !== false; // ডিফল্ট অন
+                const uploadingReels = settings.uploadingReels !== false;
 
                 if (uploadingReels) {
                     const profile = await getUserProfileInfo(chatId);
-                    // ভিডিওর সাথে আপলোডারের ইউনিক মেটাডাটা ট্যাগসহ চ্যানেলে পোস্ট করা হবে
                     const userTag = `\n\nUploaded by: ${profile.name}\n_uid_${chatId}_`;
                     await bot.sendVideo(`@${TARGET_CHANNEL}`, video.url, {
                         caption: `Use This - @SnapSavingBot` + userTag
