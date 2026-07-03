@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>SnavSaving Shorts</title>
-    <!-- Telegram WebApp SDK to get user data -->
+    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,44 +17,7 @@
             width: 100vw;
         }
 
-        /* Top Action Bar */
-        .top-bar {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 100;
-        }
-
-        .refresh-btn {
-            background: rgba(255, 255, 255, 0.15);
-            border: none;
-            color: white;
-            padding: 10px;
-            border-radius: 50%;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.3s ease;
-        }
-
-        .refresh-btn svg {
-            width: 24px;
-            height: 24px;
-            fill: currentColor;
-        }
-
-        .spinning {
-            animation: spin 0.8s linear;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Video Container */
+        /* Video Container and Sharp rendering */
         .reels-container {
             height: 100vh;
             width: 100vw;
@@ -82,7 +45,10 @@
             height: 100%;
             object-fit: contain;
             opacity: 0;
-            transition: opacity 0.4s ease-in-out;
+            transition: opacity 0.3s ease-in-out;
+            /* Enhance video rendering clarity */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
         }
 
         video.loaded {
@@ -95,8 +61,8 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            padding: 80px 20px 40px 20px;
-            background: linear-gradient(transparent, rgba(0,0,0,0.85));
+            padding: 60px 16px 30px 16px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
@@ -104,59 +70,63 @@
             z-index: 5;
         }
 
-        /* Profile & Details Styling */
+        /* Bottom Profile details next to each other */
         .video-details {
-            max-width: 70%;
+            max-width: 72%;
             color: #fff;
             pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
         .uploader-info {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 8px;
             cursor: pointer;
-            animation: fadeInSlide 0.5s ease-out;
+            animation: elegantSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        @keyframes fadeInSlide {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
+        @keyframes elegantSlide {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .uploader-info img {
-            width: 36px;
-            height: 36px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
-            border: 2px solid #fff;
+            border: 1.5px solid rgba(255, 255, 255, 0.8);
             object-fit: cover;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
 
         .uploader-info h3 {
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
         }
 
         .video-details p {
-            font-size: 14px;
-            opacity: 0.9;
-            line-height: 1.4;
+            font-size: 13px;
+            opacity: 0.85;
+            line-height: 1.35;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
 
-        /* Actions Panel */
+        /* Actions Panel - Smaller & Elegant Icons */
         .actions-panel {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
             align-items: center;
             pointer-events: auto;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .action-button {
@@ -167,37 +137,41 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-size: 11px;
-            transition: transform 0.15s;
+            font-size: 10px;
+            font-weight: 500;
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         .action-button:active {
-            transform: scale(0.85);
+            transform: scale(0.88);
         }
 
         .action-icon {
-            width: 44px;
-            height: 44px;
-            background: rgba(255, 255, 255, 0.15);
+            width: 38px;
+            height: 38px;
+            background: rgba(255, 255, 255, 0.12);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 4px;
-            backdrop-filter: blur(8px);
-            transition: background 0.3s, color 0.3s;
+            margin-bottom: 3px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: background 0.2s, color 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
-        /* Special Styling for Uploader Profile in Action Panel */
+        /* Action Panel Uploader Circle */
         .uploader-panel-pic {
-            width: 46px;
-            height: 46px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             border: 2px solid #e53e3e;
-            padding: 2px;
+            padding: 1px;
             background: #000;
             cursor: pointer;
             transition: transform 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         .uploader-panel-pic:active {
             transform: scale(0.9);
@@ -220,12 +194,12 @@
         }
 
         .action-icon svg {
-            width: 22px;
-            height: 22px;
+            width: 18px;
+            height: 18px;
             fill: currentColor;
         }
 
-        /* Double Tap Heart Animation */
+        /* Professional 3D Heart Pop Animation */
         .heart-pop {
             position: absolute;
             top: 50%;
@@ -237,19 +211,19 @@
         }
 
         @keyframes heartPop {
-            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-            50% { transform: translate(-50%, -50%) scale(1.6); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-15deg); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.4) rotate(10deg); opacity: 0.95; }
+            100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 0; }
         }
 
         .pop-active {
-            animation: heartPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            animation: heartPop 0.75s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
         .loading {
             position: absolute;
             color: rgba(255,255,255,0.7);
-            font-size: 14px;
+            font-size: 13px;
             animation: pulse 1.5s infinite;
         }
 
@@ -268,7 +242,7 @@
             height: 100vh;
             z-index: 1000;
             visibility: hidden;
-            transition: visibility 0.3s;
+            transition: visibility 0.25s;
         }
 
         .bottom-sheet.open {
@@ -281,9 +255,9 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.7);
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.25s ease;
         }
 
         .bottom-sheet.open .sheet-overlay {
@@ -295,13 +269,14 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            background: #1a1a1a;
-            border-top-left-radius: 20px;
-            border-top-right-radius: 20px;
+            background: #141414;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
             transform: translateY(100%);
-            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            padding: 24px 20px;
+            transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 20px;
             color: #fff;
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
         }
 
         .bottom-sheet.open .sheet-content {
@@ -311,13 +286,13 @@
         .sheet-header {
             display: flex;
             justify-content: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .sheet-drag-handle {
-            width: 40px;
-            height: 5px;
-            background: #444;
+            width: 36px;
+            height: 4px;
+            background: #333;
             border-radius: 10px;
         }
 
@@ -325,20 +300,20 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
+            gap: 10px;
+            margin-bottom: 20px;
         }
 
         .profile-popup-info img {
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
-            border: 3px solid #e53e3e;
+            border: 2px solid #e53e3e;
             object-fit: cover;
         }
 
         .profile-popup-info h4 {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
         }
 
@@ -346,28 +321,29 @@
         .settings-list {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
         }
 
         .setting-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 14px 16px;
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.02);
         }
 
         .setting-item span {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
         }
 
         .switch {
             position: relative;
             display: inline-block;
-            width: 48px;
-            height: 26px;
+            width: 44px;
+            height: 24px;
         }
 
         .switch input {
@@ -380,20 +356,20 @@
             position: absolute;
             cursor: pointer;
             top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #444;
-            transition: .3s;
-            border-radius: 34px;
+            background-color: #333;
+            transition: .25s;
+            border-radius: 30px;
         }
 
         .slider:before {
             position: absolute;
             content: "";
-            height: 18px;
-            width: 18px;
+            height: 16px;
+            width: 16px;
             left: 4px;
             bottom: 4px;
             background-color: white;
-            transition: .3s;
+            transition: .25s;
             border-radius: 50%;
         }
 
@@ -402,19 +378,11 @@
         }
 
         input:checked + .slider:before {
-            transform: translateX(22px);
+            transform: translateX(20px);
         }
     </style>
 </head>
 <body>
-
-    <div class="top-bar">
-        <button class="refresh-btn" onclick="refreshFeed()" id="refreshBtn">
-            <svg viewBox="0 0 24 24">
-                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-            </svg>
-        </button>
-    </div>
 
     <div class="reels-container" id="reelsContainer">
         <!-- Videos will be injected dynamically here -->
@@ -433,14 +401,14 @@
             </div>
             <div class="settings-list">
                 <div class="setting-item">
-                    <span>Start Uploading Reels</span>
+                    <span id="txt-upload">Start Uploading Reels</span>
                     <label class="switch">
                         <input type="checkbox" id="uploadToggle" onchange="updateProfileSetting('uploading')">
                         <span class="slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
-                    <span>Notifications</span>
+                    <span id="txt-notify">Notifications</span>
                     <label class="switch">
                         <input type="checkbox" id="notificationToggle" onchange="updateProfileSetting('notifications')">
                         <span class="slider"></span>
@@ -451,14 +419,12 @@
     </div>
 
     <script>
-        // Telegram WebApp Setup
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
 
-        // Current Telegram User Information
         const currentUser = {
             id: tg?.initDataUnsafe?.user?.id || "demo_user_123",
             username: tg?.initDataUnsafe?.user?.username || "Guest_User",
@@ -466,12 +432,45 @@
         };
 
         let videos = [];
+        let appLang = "bn"; // Default language
         const container = document.getElementById('reelsContainer');
 
-        // Fetch unseen/fresh videos
+        // Localization translations dictionary
+        const uiStrings = {
+            bn: {
+                save: "সেভ করুন",
+                refresh: "রিফ্রেশ",
+                report: "রিপোর্ট",
+                no_caption: "কোনো ক্যাপশন দেওয়া হয়নি।",
+                loading: "লোডিং হচ্ছে...",
+                upload_reels: "রিল আপলোড চালু রাখুন",
+                notifications: "বিজ্ঞপ্তি/নোটিফিকেশন"
+            },
+            en: {
+                save: "Save",
+                refresh: "Refresh",
+                report: "Report",
+                no_caption: "No caption provided.",
+                loading: "Loading...",
+                upload_reels: "Start Uploading Reels",
+                notifications: "Notifications"
+            }
+        };
+
+        // বটের ভাষা সেটিংস রিট্রাইভ করা
+        async function fetchLanguageAndVideos() {
+            try {
+                const res = await fetch(`/api/user/lang?userId=${currentUser.id}`);
+                const data = await res.json();
+                appLang = data.lang || "bn";
+            } catch (err) {
+                console.error("Lang fetch failed", err);
+            }
+            fetchVideos();
+        }
+
         async function fetchVideos() {
             try {
-                // local storage থেকে অদেখা ভিডিও ট্র্যাকিংয়ের জন্য হিস্ট্রি পাঠানো হচ্ছে
                 let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
                 
                 const response = await fetch('/api/videos', {
@@ -484,8 +483,6 @@
                 });
                 
                 const data = await response.json();
-                
-                // যদি সব ভিডিও দেখা হয়ে যায়, তবে ব্যাকএন্ড থেকে পুনরায় সব ভিডিও চলে আসবে এবং হিস্ট্রি রিসেট হবে
                 if (data.wasReset) {
                     localStorage.setItem('seen_videos', '[]');
                 }
@@ -499,43 +496,46 @@
 
         function renderVideos() {
             if (videos.length === 0) {
-                container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100vh;">কোনো নতুন ভিডিও পাওয়া যায়নি। অনুগ্রহ করে রিফ্রেশ করুন।</div>`;
+                container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100vh;">কোনো নতুন ভিডিও পাওয়া যায়নি।</div>`;
                 return;
             }
+
+            const str = uiStrings[appLang];
+
+            // সেটআপ ট্রান্সলেশন অন মডাল লোড
+            document.getElementById('txt-upload').innerText = str.upload_reels;
+            document.getElementById('txt-notify').innerText = str.notifications;
 
             container.innerHTML = videos.map((video, index) => {
                 const streamUrl = `/api/video/stream/${encodeURIComponent(video.fileId)}`;
                 const isLiked = localStorage.getItem(`liked_${video.id}`) === 'true';
                 const isSaved = localStorage.getItem(`saved_${video.id}`) === 'true';
                 
-                // আপলোডারের তথ্য (ডিফল্ট মান সহ)
                 const uploaderName = video.uploaderName || "@reelsuploader";
                 const uploaderPic = video.uploaderPic || "https://via.placeholder.com/150";
 
                 return `
                     <div class="reel" id="reel-${video.id}" data-index="${index}">
-                        <div class="loading">লোডিং হচ্ছে...</div>
+                        <div class="loading">${str.loading}</div>
                         <video src="${streamUrl}" loop playsinline webkit-playsinline preload="metadata" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
                         
-                        <!-- Heart animation on double-tap -->
                         <div class="heart-pop" id="heart-pop-${video.id}">
-                            <svg viewBox="0 0 24 24" width="80" height="80" fill="currentColor">
+                            <svg viewBox="0 0 24 24" width="70" height="70" fill="currentColor">
                                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                             </svg>
                         </div>
 
                         <div class="overlay">
-                            <!-- Clickable Uploader Info with animation -->
                             <div class="video-details">
                                 <div class="uploader-info" onclick="openProfileModal('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
                                     <img src="${uploaderPic}" alt="${uploaderName}">
                                     <h3>${uploaderName}</h3>
                                 </div>
-                                <p>${video.caption || "কোনো ক্যাপশন দেওয়া হয়নি।"}</p>
+                                <p>${video.caption || str.no_caption}</p>
                             </div>
 
                             <div class="actions-panel">
-                                <!-- Profile Photo above Love Reaction -->
+                                <!-- Profile Photo above Love Reaction (Dynamic Pic) -->
                                 <div class="uploader-panel-pic" onclick="openProfileModal('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
                                     <img src="${uploaderPic}" alt="${uploaderName}">
                                 </div>
@@ -560,34 +560,34 @@
                                     <span id="view-count-${video.id}">${video.views || 0}</span>
                                 </div>
 
-                                <!-- Save Button (Sends to User Chat) -->
+                                <!-- Save Button -->
                                 <button class="action-button ${isSaved ? 'saved' : ''}" onclick="toggleSave('${video.id}', event)">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
                                             <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
                                         </svg>
                                     </div>
-                                    <span>সেভ করুন</span>
+                                    <span>${str.save}</span>
                                 </button>
 
-                                <!-- Referring Icon (Re-sort Feed) -->
+                                <!-- Referring Icon -->
                                 <button class="action-button" onclick="refreshFeed(event)">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
                                             <path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/>
                                         </svg>
                                     </div>
-                                    <span>ফিড রিফ্রেশ</span>
+                                    <span>${str.refresh}</span>
                                 </button>
 
                                 <!-- Report Button -->
                                 <button class="action-button" onclick="reportVideo('${video.id}', event)">
-                                    <div class="action-icon" style="background: rgba(229, 62, 62, 0.2);">
+                                    <div class="action-icon" style="background: rgba(229, 62, 62, 0.15);">
                                         <svg viewBox="0 0 24 24" style="color: #e53e3e;">
                                             <path d="M15.73 3H8.27L3 8.27v7.46L8.27 21h7.46L21 15.73V8.27L15.73 3zM12 17.3c-.72 0-1.3-.58-1.3-1.3 0-.72.58-1.3 1.3-1.3.72 0 1.3.58 1.3 1.3 0 .72-.58 1.3-1.3 1.3zm1-4.3h-2V7h2v6z"/>
                                         </svg>
                                     </div>
-                                    <span style="color: #e53e3e;">রিপোর্ট</span>
+                                    <span style="color: #e53e3e;">${str.report}</span>
                                 </button>
                             </div>
                         </div>
@@ -607,13 +607,12 @@
 
         function togglePlay(video) {
             if (video.paused) {
-                video.play().catch(e => console.log("Blocked play"));
+                video.play().catch(e => console.log("Blocked"));
             } else {
                 video.pause();
             }
         }
 
-        // Like / Dislike Video
         async function toggleLike(videoId, event) {
             if (event) event.stopPropagation();
             
@@ -645,18 +644,17 @@
                     })
                 });
             } catch (err) {
-                console.error("Error updating like", err);
+                console.error(err);
             }
         }
 
-        // Save Video to Telegram Bot Chat
         async function toggleSave(videoId, event) {
             if (event) event.stopPropagation();
             
             const saveBtn = document.querySelector(`#reel-${videoId} .action-button:has(svg path[d*="M17 3H7"])`) || event.currentTarget;
             const isSaved = saveBtn.classList.contains('saved');
-            
             const newSavedState = !isSaved;
+
             if (newSavedState) {
                 saveBtn.classList.add('saved');
                 localStorage.setItem(`saved_${videoId}`, 'true');
@@ -675,41 +673,29 @@
                         isSaved: newSavedState 
                     })
                 });
-                if (newSavedState) {
-                    alert('ভিডিওটি আপনার বটের ইনবক্সে পাঠানো হয়েছে!');
-                }
             } catch (err) {
-                console.error("Error saving video", err);
+                console.error(err);
             }
         }
 
-        // Report Video
         async function reportVideo(videoId, event) {
             if (event) event.stopPropagation();
-            
-            const confirmReport = confirm("আপনি কি নিশ্চিতভাবে এই ভিডিওটির বিরুদ্ধে রিপোর্ট করতে চান?");
-            if (!confirmReport) return;
+            const str = uiStrings[appLang];
+            const confirmMsg = appLang === "bn" ? "রিপোর্ট করতে চান?" : "Do you want to report this?";
+            if (!confirm(confirmMsg)) return;
 
             try {
-                const response = await fetch('/api/video/report', {
+                await fetch('/api/video/report', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        videoId, 
-                        userId: currentUser.id,
-                        username: currentUser.username 
-                    })
+                    body: JSON.stringify({ videoId, userId: currentUser.id, username: currentUser.username })
                 });
-                
-                if (response.ok) {
-                    alert('রিপোর্টটি সফলভাবে অ্যাডমিন প্যানেলে পাঠানো হয়েছে। ধন্যবাদ!');
-                }
+                alert(appLang === "bn" ? "সফল হয়েছে" : "Success");
             } catch (err) {
-                console.error("Error reporting video", err);
+                console.error(err);
             }
         }
 
-        // Mark Video as Watched when finished
         function markAsWatched(videoId) {
             let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
             if (!seenVideos.includes(videoId)) {
@@ -718,7 +704,6 @@
             }
         }
 
-        // Track Video Views
         async function trackView(videoId) {
             try {
                 const viewCountSpan = document.getElementById(`view-count-${videoId}`);
@@ -726,52 +711,30 @@
                     let currentViews = parseInt(viewCountSpan.innerText);
                     viewCountSpan.innerText = currentViews + 1;
                 }
-
                 await fetch('/api/video/view', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        videoId, 
-                        userId: currentUser.id 
-                    })
+                    body: JSON.stringify({ videoId, userId: currentUser.id })
                 });
             } catch (err) {
-                console.error("View track error", err);
+                console.error(err);
             }
         }
 
-        // Refresh Feed Action
         function refreshFeed(event) {
             if (event) event.stopPropagation();
-            const btn = document.getElementById('refreshBtn');
-            btn.classList.add('spinning');
-            
-            fetchVideos().then(() => {
-                setTimeout(() => {
-                    btn.classList.remove('spinning');
-                }, 800);
-            });
+            fetchVideos();
         }
 
-        // Intersection Observer
         function setupIntersectionObserver() {
-            const observerOptions = {
-                root: container,
-                threshold: 0.65
-            };
-
+            const observerOptions = { root: container, threshold: 0.65 };
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     const video = entry.target.querySelector('video');
                     const videoId = entry.target.id.replace('reel-', '');
-
                     if (video) {
                         if (entry.isIntersecting) {
-                            video.play().then(() => {
-                                trackView(videoId);
-                            }).catch(err => {
-                                console.log("Autoplay context initialization required user gesture");
-                            });
+                            video.play().then(() => trackView(videoId)).catch(() => {});
                         } else {
                             video.pause();
                             video.currentTime = 0;
@@ -779,58 +742,44 @@
                     }
                 });
             }, observerOptions);
-
             document.querySelectorAll('.reel').forEach(reel => observer.observe(reel));
         }
 
-        // Double Tap
         function setupDoubleTap() {
             document.querySelectorAll('.reel').forEach(reel => {
                 let lastTap = 0;
-                reel.addEventListener('click', function(e) {
+                reel.addEventListener('click', function() {
                     const currentTime = new Date().getTime();
                     const tapLength = currentTime - lastTap;
                     if (tapLength < 300 && tapLength > 0) {
                         const videoId = reel.id.replace('reel-', '');
-                        
                         const heartPop = document.getElementById(`heart-pop-${videoId}`);
                         heartPop.classList.add('pop-active');
-                        setTimeout(() => heartPop.classList.remove('pop-active'), 800);
-
+                        setTimeout(() => heartPop.classList.remove('pop-active'), 750);
                         const likeBtn = reel.querySelector('.action-button');
-                        if (!likeBtn.classList.contains('liked')) {
-                            toggleLike(videoId);
-                        }
+                        if (!likeBtn.classList.contains('liked')) toggleLike(videoId);
                     }
                     lastTap = currentTime;
                 });
             });
         }
 
-        /* --- Profile Modal Popup Logic --- */
         let activeProfileUserId = null;
-
         async function openProfileModal(uploaderId, uploaderName, uploaderPic) {
             activeProfileUserId = uploaderId;
-            
             document.getElementById('modalProfileName').innerText = uploaderName;
             document.getElementById('modalProfilePic').src = uploaderPic;
 
-            // টগল সুইচগুলোর পূর্বের অবস্থা লোড করা
             try {
                 const res = await fetch(`/api/user/settings?userId=${uploaderId}`);
                 const settings = await res.json();
-                
-                document.getElementById('uploadToggle').checked = settings.uploadingReels !== false; // default true
-                document.getElementById('notificationToggle').checked = settings.notifications !== false; // default true
+                document.getElementById('uploadToggle').checked = settings.uploadingReels !== false;
+                document.getElementById('notificationToggle').checked = settings.notifications !== false;
             } catch (err) {
-                console.error("Settings load failed, using local fallback", err);
-                // Fallback to localStorage
                 document.getElementById('uploadToggle').checked = localStorage.getItem(`setting_upload_${uploaderId}`) !== 'false';
                 document.getElementById('notificationToggle').checked = localStorage.getItem(`setting_notify_${uploaderId}`) !== 'false';
             }
 
-            // যদি এই প্রোফাইলটি বর্তমান ইউজারের না হয়, তবে টগলগুলো ডিজেবল রাখা যেতে পারে
             if (uploaderId !== currentUser.id) {
                 document.getElementById('uploadToggle').disabled = true;
                 document.getElementById('notificationToggle').disabled = true;
@@ -838,7 +787,6 @@
                 document.getElementById('uploadToggle').disabled = false;
                 document.getElementById('notificationToggle').disabled = false;
             }
-
             document.getElementById('profileModal').classList.add('open');
         }
 
@@ -846,16 +794,10 @@
             document.getElementById('profileModal').classList.remove('open');
         }
 
-        // Update Profile Switches
-        async function updateProfileSetting(type) {
-            if (activeProfileUserId !== currentUser.id) return; // নিরাপত্তা যাচাই
-
+        async function updateProfileSetting() {
+            if (activeProfileUserId !== currentUser.id) return;
             const uploadingVal = document.getElementById('uploadToggle').checked;
             const notificationVal = document.getElementById('notificationToggle').checked;
-
-            // লোকাল স্টোরেজে সংরক্ষণ
-            localStorage.setItem(`setting_upload_${activeProfileUserId}`, uploadingVal);
-            localStorage.setItem(`setting_notify_${activeProfileUserId}`, notificationVal);
 
             try {
                 await fetch('/api/user/settings', {
@@ -868,11 +810,11 @@
                     })
                 });
             } catch (err) {
-                console.error("Failed to sync settings with server", err);
+                console.error(err);
             }
         }
 
-        fetchVideos();
+        fetchLanguageAndVideos();
     </script>
 </body>
 </html>
