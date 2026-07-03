@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>SnavSaving Shorts</title>
+    <!-- Telegram WebApp SDK to get user data -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -15,7 +17,7 @@
             width: 100vw;
         }
 
-        /* Top Action Bar (Refresh Option) */
+        /* Top Action Bar */
         .top-bar {
             position: absolute;
             top: 20px;
@@ -43,7 +45,6 @@
             fill: currentColor;
         }
 
-        /* Spin animation when refreshed */
         .spinning {
             animation: spin 0.8s linear;
         }
@@ -53,7 +54,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Ultra-Smooth Fullscreen scroll container */
+        /* Video Container */
         .reels-container {
             height: 100vh;
             width: 100vw;
@@ -61,10 +62,9 @@
             scroll-snap-type: y mandatory;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
-            transform: translate3d(0, 0, 0); /* Hardware Acceleration */
+            transform: translate3d(0, 0, 0);
         }
 
-        /* Individual Reel Section */
         .reel {
             position: relative;
             height: 100vh;
@@ -77,11 +77,10 @@
             background: #000;
         }
 
-        /* Video element optimized (No zoom, original size, smooth-fade) */
         video {
             width: 100%;
             height: 100%;
-            object-fit: contain; /* জুম ছাড়া মেইন সাইজ প্রদর্শন করবে */
+            object-fit: contain;
             opacity: 0;
             transition: opacity 0.4s ease-in-out;
         }
@@ -105,15 +104,38 @@
             z-index: 5;
         }
 
+        /* Profile & Details Styling */
         .video-details {
-            max-width: 75%;
+            max-width: 70%;
             color: #fff;
             pointer-events: auto;
         }
 
-        .video-details h3 {
-            font-size: 16px;
-            margin-bottom: 8px;
+        .uploader-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            animation: fadeInSlide 0.5s ease-out;
+        }
+
+        @keyframes fadeInSlide {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .uploader-info img {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            object-fit: cover;
+        }
+
+        .uploader-info h3 {
+            font-size: 15px;
+            font-weight: 600;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
         }
 
@@ -127,11 +149,11 @@
             overflow: hidden;
         }
 
-        /* Right Side Actions Panel */
+        /* Actions Panel */
         .actions-panel {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 15px;
             align-items: center;
             pointer-events: auto;
             margin-bottom: 10px;
@@ -145,7 +167,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-size: 12px;
+            font-size: 11px;
             transition: transform 0.15s;
         }
 
@@ -161,9 +183,30 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
             backdrop-filter: blur(8px);
-            transition: background 0.3s;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* Special Styling for Uploader Profile in Action Panel */
+        .uploader-panel-pic {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border: 2px solid #e53e3e;
+            padding: 2px;
+            background: #000;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .uploader-panel-pic:active {
+            transform: scale(0.9);
+        }
+        .uploader-panel-pic img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
         }
 
         .action-button.liked .action-icon {
@@ -171,9 +214,14 @@
             color: #fff;
         }
 
+        .action-button.saved .action-icon {
+            background: #3182ce;
+            color: #fff;
+        }
+
         .action-icon svg {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             fill: currentColor;
         }
 
@@ -198,7 +246,6 @@
             animation: heartPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
-        /* Shimmer Loader style */
         .loading {
             position: absolute;
             color: rgba(255,255,255,0.7);
@@ -210,6 +257,152 @@
             0% { opacity: 0.5; }
             50% { opacity: 1; }
             100% { opacity: 0.5; }
+        }
+
+        /* Bottom Sheet Popup Styles */
+        .bottom-sheet {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1000;
+            visibility: hidden;
+            transition: visibility 0.3s;
+        }
+
+        .bottom-sheet.open {
+            visibility: visible;
+        }
+
+        .sheet-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .bottom-sheet.open .sheet-overlay {
+            opacity: 1;
+        }
+
+        .sheet-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #1a1a1a;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 24px 20px;
+            color: #fff;
+        }
+
+        .bottom-sheet.open .sheet-content {
+            transform: translateY(0);
+        }
+
+        .sheet-header {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .sheet-drag-handle {
+            width: 40px;
+            height: 5px;
+            background: #444;
+            border-radius: 10px;
+        }
+
+        .profile-popup-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .profile-popup-info img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid #e53e3e;
+            object-fit: cover;
+        }
+
+        .profile-popup-info h4 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Toggle Switches */
+        .settings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 14px 16px;
+            border-radius: 12px;
+        }
+
+        .setting-item span {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 26px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #444;
+            transition: .3s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #38a169;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
         }
     </style>
 </head>
@@ -227,14 +420,77 @@
         <!-- Videos will be injected dynamically here -->
     </div>
 
+    <!-- Bottom Sheet Popup HTML -->
+    <div class="bottom-sheet" id="profileModal">
+        <div class="sheet-overlay" onclick="closeProfileModal()"></div>
+        <div class="sheet-content">
+            <div class="sheet-header">
+                <div class="sheet-drag-handle"></div>
+            </div>
+            <div class="profile-popup-info">
+                <img id="modalProfilePic" src="https://via.placeholder.com/150" alt="Profile">
+                <h4 id="modalProfileName">ইউজারনেম</h4>
+            </div>
+            <div class="settings-list">
+                <div class="setting-item">
+                    <span>Start Uploading Reels</span>
+                    <label class="switch">
+                        <input type="checkbox" id="uploadToggle" onchange="updateProfileSetting('uploading')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <span>Notifications</span>
+                    <label class="switch">
+                        <input type="checkbox" id="notificationToggle" onchange="updateProfileSetting('notifications')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Telegram WebApp Setup
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // Current Telegram User Information
+        const currentUser = {
+            id: tg?.initDataUnsafe?.user?.id || "demo_user_123",
+            username: tg?.initDataUnsafe?.user?.username || "Guest_User",
+            photo: tg?.initDataUnsafe?.user?.photo_url || "https://via.placeholder.com/150"
+        };
+
         let videos = [];
         const container = document.getElementById('reelsContainer');
 
+        // Fetch unseen/fresh videos
         async function fetchVideos() {
             try {
-                const res = await fetch('/api/videos');
-                videos = await res.json();
+                // local storage থেকে অদেখা ভিডিও ট্র্যাকিংয়ের জন্য হিস্ট্রি পাঠানো হচ্ছে
+                let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
+                
+                const response = await fetch('/api/videos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        userId: currentUser.id,
+                        seenVideos: seenVideos 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // যদি সব ভিডিও দেখা হয়ে যায়, তবে ব্যাকএন্ড থেকে পুনরায় সব ভিডিও চলে আসবে এবং হিস্ট্রি রিসেট হবে
+                if (data.wasReset) {
+                    localStorage.setItem('seen_videos', '[]');
+                }
+                
+                videos = data.videos || [];
                 renderVideos();
             } catch (err) {
                 console.error("Failed to load videos", err);
@@ -243,18 +499,23 @@
 
         function renderVideos() {
             if (videos.length === 0) {
-                container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100vh;">কোনো ভিডিও খুঁজে পাওয়া যায়নি।</div>`;
+                container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100vh;">কোনো নতুন ভিডিও পাওয়া যায়নি। অনুগ্রহ করে রিফ্রেশ করুন।</div>`;
                 return;
             }
 
             container.innerHTML = videos.map((video, index) => {
                 const streamUrl = `/api/video/stream/${encodeURIComponent(video.fileId)}`;
                 const isLiked = localStorage.getItem(`liked_${video.id}`) === 'true';
+                const isSaved = localStorage.getItem(`saved_${video.id}`) === 'true';
+                
+                // আপলোডারের তথ্য (ডিফল্ট মান সহ)
+                const uploaderName = video.uploaderName || "@reelsuploader";
+                const uploaderPic = video.uploaderPic || "https://via.placeholder.com/150";
 
                 return `
                     <div class="reel" id="reel-${video.id}" data-index="${index}">
                         <div class="loading">লোডিং হচ্ছে...</div>
-                        <video src="${streamUrl}" loop playsinline webkit-playsinline preload="metadata" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)"></video>
+                        <video src="${streamUrl}" loop playsinline webkit-playsinline preload="metadata" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
                         
                         <!-- Heart animation on double-tap -->
                         <div class="heart-pop" id="heart-pop-${video.id}">
@@ -264,12 +525,21 @@
                         </div>
 
                         <div class="overlay">
+                            <!-- Clickable Uploader Info with animation -->
                             <div class="video-details">
-                                <h3>@reelsuploder</h3>
+                                <div class="uploader-info" onclick="openProfileModal('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
+                                    <img src="${uploaderPic}" alt="${uploaderName}">
+                                    <h3>${uploaderName}</h3>
+                                </div>
                                 <p>${video.caption || "কোনো ক্যাপশন দেওয়া হয়নি।"}</p>
                             </div>
 
                             <div class="actions-panel">
+                                <!-- Profile Photo above Love Reaction -->
+                                <div class="uploader-panel-pic" onclick="openProfileModal('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
+                                    <img src="${uploaderPic}" alt="${uploaderName}">
+                                </div>
+
                                 <!-- Love Button -->
                                 <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
                                     <div class="action-icon">
@@ -289,6 +559,36 @@
                                     </div>
                                     <span id="view-count-${video.id}">${video.views || 0}</span>
                                 </div>
+
+                                <!-- Save Button (Sends to User Chat) -->
+                                <button class="action-button ${isSaved ? 'saved' : ''}" onclick="toggleSave('${video.id}', event)">
+                                    <div class="action-icon">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                                        </svg>
+                                    </div>
+                                    <span>সেভ করুন</span>
+                                </button>
+
+                                <!-- Referring Icon (Re-sort Feed) -->
+                                <button class="action-button" onclick="refreshFeed(event)">
+                                    <div class="action-icon">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/>
+                                        </svg>
+                                    </div>
+                                    <span>ফিড রিফ্রেশ</span>
+                                </button>
+
+                                <!-- Report Button -->
+                                <button class="action-button" onclick="reportVideo('${video.id}', event)">
+                                    <div class="action-icon" style="background: rgba(229, 62, 62, 0.2);">
+                                        <svg viewBox="0 0 24 24" style="color: #e53e3e;">
+                                            <path d="M15.73 3H8.27L3 8.27v7.46L8.27 21h7.46L21 15.73V8.27L15.73 3zM12 17.3c-.72 0-1.3-.58-1.3-1.3 0-.72.58-1.3 1.3-1.3.72 0 1.3.58 1.3 1.3 0 .72-.58 1.3-1.3 1.3zm1-4.3h-2V7h2v6z"/>
+                                        </svg>
+                                    </div>
+                                    <span style="color: #e53e3e;">রিপোর্ট</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -299,7 +599,6 @@
             setupDoubleTap();
         }
 
-        // Triggered when video is ready (Smooth Fade-in)
         function videoLoaded(videoElement) {
             videoElement.classList.add('loaded');
             const loadingText = videoElement.parentElement.querySelector('.loading');
@@ -314,7 +613,7 @@
             }
         }
 
-        // Like/Love action logic
+        // Like / Dislike Video
         async function toggleLike(videoId, event) {
             if (event) event.stopPropagation();
             
@@ -338,10 +637,84 @@
                 await fetch('/api/video/like', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ videoId, isLiked: newLikedState })
+                    body: JSON.stringify({ 
+                        videoId, 
+                        isLiked: newLikedState, 
+                        userId: currentUser.id,
+                        username: currentUser.username 
+                    })
                 });
             } catch (err) {
                 console.error("Error updating like", err);
+            }
+        }
+
+        // Save Video to Telegram Bot Chat
+        async function toggleSave(videoId, event) {
+            if (event) event.stopPropagation();
+            
+            const saveBtn = document.querySelector(`#reel-${videoId} .action-button:has(svg path[d*="M17 3H7"])`) || event.currentTarget;
+            const isSaved = saveBtn.classList.contains('saved');
+            
+            const newSavedState = !isSaved;
+            if (newSavedState) {
+                saveBtn.classList.add('saved');
+                localStorage.setItem(`saved_${videoId}`, 'true');
+            } else {
+                saveBtn.classList.remove('saved');
+                localStorage.removeItem(`saved_${videoId}`);
+            }
+
+            try {
+                await fetch('/api/video/save', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        videoId, 
+                        userId: currentUser.id, 
+                        isSaved: newSavedState 
+                    })
+                });
+                if (newSavedState) {
+                    alert('ভিডিওটি আপনার বটের ইনবক্সে পাঠানো হয়েছে!');
+                }
+            } catch (err) {
+                console.error("Error saving video", err);
+            }
+        }
+
+        // Report Video
+        async function reportVideo(videoId, event) {
+            if (event) event.stopPropagation();
+            
+            const confirmReport = confirm("আপনি কি নিশ্চিতভাবে এই ভিডিওটির বিরুদ্ধে রিপোর্ট করতে চান?");
+            if (!confirmReport) return;
+
+            try {
+                const response = await fetch('/api/video/report', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        videoId, 
+                        userId: currentUser.id,
+                        username: currentUser.username 
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('রিপোর্টটি সফলভাবে অ্যাডমিন প্যানেলে পাঠানো হয়েছে। ধন্যবাদ!');
+                }
+            } catch (err) {
+                console.error("Error reporting video", err);
+            }
+        }
+
+        // Mark Video as Watched when finished
+        function markAsWatched(videoId) {
+            let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
+            if (!seenVideos.includes(videoId)) {
+                seenVideos.push(videoId);
+                localStorage.setItem('seen_videos', JSON.stringify(seenVideos));
             }
         }
 
@@ -357,19 +730,22 @@
                 await fetch('/api/video/view', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ videoId })
+                    body: JSON.stringify({ 
+                        videoId, 
+                        userId: currentUser.id 
+                    })
                 });
             } catch (err) {
                 console.error("View track error", err);
             }
         }
 
-        // Feed Refresh Action with Rotation Animation
-        function refreshFeed() {
+        // Refresh Feed Action
+        function refreshFeed(event) {
+            if (event) event.stopPropagation();
             const btn = document.getElementById('refreshBtn');
             btn.classList.add('spinning');
             
-            // রিলোড এবং রি-সর্ট ভিডিও
             fetchVideos().then(() => {
                 setTimeout(() => {
                     btn.classList.remove('spinning');
@@ -377,7 +753,7 @@
             });
         }
 
-        // Intersection Observer with precise performance optimization
+        // Intersection Observer
         function setupIntersectionObserver() {
             const observerOptions = {
                 root: container,
@@ -394,7 +770,7 @@
                             video.play().then(() => {
                                 trackView(videoId);
                             }).catch(err => {
-                                console.log("Autoplay require click interaction");
+                                console.log("Autoplay context initialization required user gesture");
                             });
                         } else {
                             video.pause();
@@ -407,7 +783,7 @@
             document.querySelectorAll('.reel').forEach(reel => observer.observe(reel));
         }
 
-        // Double tap setup
+        // Double Tap
         function setupDoubleTap() {
             document.querySelectorAll('.reel').forEach(reel => {
                 let lastTap = 0;
@@ -429,6 +805,71 @@
                     lastTap = currentTime;
                 });
             });
+        }
+
+        /* --- Profile Modal Popup Logic --- */
+        let activeProfileUserId = null;
+
+        async function openProfileModal(uploaderId, uploaderName, uploaderPic) {
+            activeProfileUserId = uploaderId;
+            
+            document.getElementById('modalProfileName').innerText = uploaderName;
+            document.getElementById('modalProfilePic').src = uploaderPic;
+
+            // টগল সুইচগুলোর পূর্বের অবস্থা লোড করা
+            try {
+                const res = await fetch(`/api/user/settings?userId=${uploaderId}`);
+                const settings = await res.json();
+                
+                document.getElementById('uploadToggle').checked = settings.uploadingReels !== false; // default true
+                document.getElementById('notificationToggle').checked = settings.notifications !== false; // default true
+            } catch (err) {
+                console.error("Settings load failed, using local fallback", err);
+                // Fallback to localStorage
+                document.getElementById('uploadToggle').checked = localStorage.getItem(`setting_upload_${uploaderId}`) !== 'false';
+                document.getElementById('notificationToggle').checked = localStorage.getItem(`setting_notify_${uploaderId}`) !== 'false';
+            }
+
+            // যদি এই প্রোফাইলটি বর্তমান ইউজারের না হয়, তবে টগলগুলো ডিজেবল রাখা যেতে পারে
+            if (uploaderId !== currentUser.id) {
+                document.getElementById('uploadToggle').disabled = true;
+                document.getElementById('notificationToggle').disabled = true;
+            } else {
+                document.getElementById('uploadToggle').disabled = false;
+                document.getElementById('notificationToggle').disabled = false;
+            }
+
+            document.getElementById('profileModal').classList.add('open');
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.remove('open');
+        }
+
+        // Update Profile Switches
+        async function updateProfileSetting(type) {
+            if (activeProfileUserId !== currentUser.id) return; // নিরাপত্তা যাচাই
+
+            const uploadingVal = document.getElementById('uploadToggle').checked;
+            const notificationVal = document.getElementById('notificationToggle').checked;
+
+            // লোকাল স্টোরেজে সংরক্ষণ
+            localStorage.setItem(`setting_upload_${activeProfileUserId}`, uploadingVal);
+            localStorage.setItem(`setting_notify_${activeProfileUserId}`, notificationVal);
+
+            try {
+                await fetch('/api/user/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        userId: currentUser.id,
+                        uploadingReels: uploadingVal,
+                        notifications: notificationVal
+                    })
+                });
+            } catch (err) {
+                console.error("Failed to sync settings with server", err);
+            }
         }
 
         fetchVideos();
