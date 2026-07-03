@@ -80,6 +80,41 @@ const chatBoxConfig = {
     }
 };
 
+// --- Helper Functions ---
+
+// ইউজারের প্রোফাইল পিকচার এবং নাম ডায়নামিকালি রিট্রিভ করার হেল্পার ফাংশন
+async function getUserProfileInfo(userId) {
+    try {
+        const chat = await bot.getChat(userId);
+        const name = chat.first_name ? `${chat.first_name} ${chat.last_name || ''}`.trim() : (chat.title || chat.username || "Anonymous");
+        
+        let photoUrl = "https://via.placeholder.com/150";
+        if (chat.photo && chat.photo.small_file_id) {
+            const file = await bot.getFile(chat.photo.small_file_id);
+            photoUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+        }
+        return { name, photoUrl };
+    } catch (err) {
+        return { name: "Anonymous", photoUrl: "https://via.placeholder.com/150" };
+    }
+}
+
+// ইন-অ্যাপ নোটিফিকেশন পাঠানোর মেকানিজম (যদি নোটিফিকেশন অন থাকে)
+async function sendNotification(uploaderId, message) {
+    if (!uploaderId || uploaderId.startsWith('-100')) return; // চ্যাট আইডি চ্যানেল হলে স্কিপ করবে
+    try {
+        const settingsSnap = await db.ref(`users/${uploaderId}/settings`).once('value');
+        const settings = settingsSnap.val() || {};
+        const notificationsEnabled = settings.notifications !== false; // ডিফল্ট অন
+
+        if (notificationsEnabled) {
+            await bot.sendMessage(uploaderId, message, { parse_mode: 'HTML' });
+        }
+    } catch (err) {
+        console.error("Failed to send notification:", err.message);
+    }
+}
+
 // --- Page Routes ---
 app.get('/', (req, res) => { res.send('Bot is running...'); });
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'indexadmin.html')); });
@@ -223,19 +258,56 @@ app.post('/api/admin/broadcast', async (req, res) => {
     }
 });
 
-// --- Mini App API Routes (Optimized) ---
+// --- Mini App API Routes (Updated) ---
 
-// ফাইল সাইজ অনুযায়ী ভিডিও সর্ট করার লজিক (ছোট ভিডিও আগে লোড হবে)
+// পোস্ট মেথড ব্যবহার করে দেখা শেষ হওয়া ভিডিওগুলোকে বাদ দিয়ে ফিড রিসেট করা ও নতুন র্যান্ডমাইজেশন
+app.post('/api/videos', async (req, res) => {
+    try {
+        const { seenVideos } = req.body;
+        const snap = await db.ref('mini_app_videos').once('value');
+        const data = snap.val() || {};
+        
+        let videoList = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key]
+        }));
+
+        let wasReset = false;
+        const seenSet = new Set(seenVideos || []);
+
+        // অদেখা ভিডিওগুলো ফিল্টার করা
+        let filteredList = videoList.filter(video => !seenSet.has(video.id));
+
+        // সব ভিডিও দেখা হয়ে গেলে ফিড পুনরায় খালি ও রিসেট করা
+        if (filteredList.length === 0 && videoList.length > 0) {
+            filteredList = videoList;
+            wasReset = true;
+        }
+
+        // প্রতিবার পেজ ওপেন বা রিলোড করলে ভিডিও সাজানোর তালিকা র্যান্ডমাইজ করা
+        filteredList.sort(() => Math.random() - 0.5);
+        
+        res.json({
+            videos: filteredList,
+            wasReset
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// পূর্বের এপিআই কম্প্যাটিবিলিটির জন্য GET মেথড সচল রাখা হয়েছে
 app.get('/api/videos', async (req, res) => {
     try {
         const snap = await db.ref('mini_app_videos').once('value');
         const data = snap.val() || {};
         
-        const videoList = Object.keys(data).map(key => ({
+        let videoList = Object.keys(data).map(key => ({
             id: key,
             ...data[key]
-        })).sort((a, b) => (a.fileSize || 0) - (b.fileSize || 0)); 
+        }));
         
+        videoList.sort(() => Math.random() - 0.5);
         res.json(videoList);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -270,18 +342,30 @@ app.get('/api/video/stream/:fileId', async (req, res) => {
 });
 
 app.post('/api/video/like', async (req, res) => {
-    const { videoId, isLiked } = req.body;
+    const { videoId, isLiked, userId, username } = req.body;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
 
     try {
-        const likeRef = db.ref(`mini_app_videos/${videoId}/likes`);
-        await likeRef.transaction((currentLikes) => {
+        const videoRef = db.ref(`mini_app_videos/${videoId}`);
+        const videoSnap = await videoRef.once('value');
+        const video = videoSnap.val();
+
+        if (!video) return res.status(404).json({ error: "Video not found" });
+
+        await videoRef.child('likes').transaction((currentLikes) => {
             if (isLiked) {
                 return (currentLikes || 0) + 1;
             } else {
                 return Math.max(0, (currentLikes || 1) - 1);
             }
         });
+
+        // লাইক পড়লে আপলোডারকে বটের মাধ্যমে নোটিফিকেশন প্রেরণ
+        if (isLiked && video.uploaderId && video.uploaderId !== userId) {
+            const likerName = username ? `@${username}` : "কেউ একজন";
+            await sendNotification(video.uploaderId, `❤️ <b>${likerName}</b> আপনার রিল ভিডিওটি লাইক করেছেন!`);
+        }
+
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -289,12 +373,111 @@ app.post('/api/video/like', async (req, res) => {
 });
 
 app.post('/api/video/view', async (req, res) => {
-    const { videoId } = req.body;
+    const { videoId, userId } = req.body;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
 
     try {
-        const viewRef = db.ref(`mini_app_videos/${videoId}/views`);
-        await viewRef.transaction((currentViews) => (currentViews || 0) + 1);
+        const videoRef = db.ref(`mini_app_videos/${videoId}`);
+        const videoSnap = await videoRef.once('value');
+        const video = videoSnap.val();
+
+        if (!video) return res.status(404).json({ error: "Video not found" });
+
+        await videoRef.child('views').transaction((currentViews) => (currentViews || 0) + 1);
+
+        // ভিউ পড়লে আপলোডারকে বটের মাধ্যমে নোটিফিকেশন প্রেরণ
+        if (video.uploaderId && video.uploaderId !== userId) {
+            await sendNotification(video.uploaderId, `👁️ কেউ একজন আপনার রিল ভিডিওটি দেখেছেন!`);
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ভিডিও সেভ অপশন ও আপলোডার নোটিফিকেশন সিস্টেম
+app.post('/api/video/save', async (req, res) => {
+    const { videoId, userId, isSaved } = req.body;
+    if (!videoId || !userId) return res.status(400).json({ error: "Missing parameters" });
+
+    try {
+        const videoSnap = await db.ref(`mini_app_videos/${videoId}`).once('value');
+        const video = videoSnap.val();
+
+        if (!video) return res.status(404).json({ error: "Video not found" });
+
+        if (isSaved) {
+            await bot.sendVideo(userId, video.fileId, {
+                caption: `💾 <b>সংরক্ষিত ভিডিও!</b>\n\nক্যাপশন: ${video.caption || "নেই"}\n\nসরাসরি মিনি অ্যাপ থেকে সংরক্ষিত।`,
+                parse_mode: 'HTML'
+            });
+
+            // সেভ করার পর আপলোডারকে নোটিফাই করা
+            if (video.uploaderId && video.uploaderId !== userId) {
+                await sendNotification(video.uploaderId, `💾 কেউ একজন আপনার রিল ভিডিওটি তার বটের চ্যাটে সেভ করেছেন!`);
+            }
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ভিডিও রিপোর্টিং এবং এডমিন প্যানেল রিমুভ অ্যালার্ট সিস্টেম
+app.post('/api/video/report', async (req, res) => {
+    const { videoId, userId, username } = req.body;
+    if (!videoId) return res.status(400).json({ error: "Missing parameters" });
+
+    try {
+        const videoSnap = await db.ref(`mini_app_videos/${videoId}`).once('value');
+        const video = videoSnap.val();
+
+        if (!video) return res.status(404).json({ error: "Video not found" });
+
+        const reporterName = username ? `@${username}` : "Unknown User";
+        const adminMsg = `⚠️ <b>ভিডিও রিপোর্ট নোটিফিকেশন!</b>\n\n👤 <b>রিপোর্টকারী:</b> ${reporterName} (ID: ${userId})\n🆔 <b>রিল আইডি:</b> ${videoId}\n💬 <b>ক্যাপশন:</b> ${video.caption || "নেই"}`;
+
+        await bot.sendMessage(ADMIN_ID, adminMsg, {
+            parse_mode: 'HTML',
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: "❌ Remove Video from Server", callback_data: `remove_vid_${videoId}` }
+                    ]
+                ]
+            }
+        });
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ইউজার সেটিংস এপিআই এন্ডপয়েন্ট (রিল আপলোডিং অন/অফ এবং নোটিফিকেশন সেটিংস)
+app.get('/api/user/settings', async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+    try {
+        const snap = await db.ref(`users/${userId}/settings`).once('value');
+        const settings = snap.val() || { uploadingReels: true, notifications: true };
+        res.json(settings);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/user/settings', async (req, res) => {
+    const { userId, uploadingReels, notifications } = req.body;
+    if (!userId) return res.status(400).json({ error: "Missing userId" });
+
+    try {
+        await db.ref(`users/${userId}/settings`).set({
+            uploadingReels: uploadingReels !== false,
+            notifications: notifications !== false
+        });
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -334,7 +517,7 @@ async function getMissingChannels(userId) {
     } catch (e) { return []; }
 }
 
-// @reelsuploder চ্যানেল থেকে ভিডিও অটো সিঙ্ক, লাইক এবং অ্যাডমিন অ্যালার্ট সিস্টেম
+// @reelsuploder চ্যানেল থেকে ভিডিও অটো সিঙ্ক ও ইউজার মেটাডাটা এক্সট্রাকশন লজিক
 bot.on('channel_post', async (msg) => {
     const targetChannel = TARGET_CHANNEL;
 
@@ -347,13 +530,33 @@ bot.on('channel_post', async (msg) => {
                 const caption = msg.caption || "";
                 const messageId = msg.message_id;
 
-                // ডাটাবেসে ভিডিও তথ্য সংরক্ষণ
+                let uploaderId = msg.chat.id.toString();
+                let uploaderName = `@${msg.chat.username}` || msg.chat.title || "Reels Uploader";
+                let uploaderPic = "https://via.placeholder.com/150";
+
+                // ক্যাপশন থেকে হিডেন মেটাডাটা এক্সট্রাক্ট করে ইউজার প্রোফাইল নির্ধারণ
+                const uidMatch = caption.match(/_uid_(\d+)_/);
+                if (uidMatch) {
+                    const extractedUserId = uidMatch[1];
+                    const profile = await getUserProfileInfo(extractedUserId);
+                    uploaderId = extractedUserId;
+                    uploaderName = profile.name;
+                    uploaderPic = profile.photoUrl;
+                } else {
+                    const channelProfile = await getUserProfileInfo(msg.chat.id);
+                    uploaderPic = channelProfile.photoUrl;
+                }
+
+                // ডাটাবেসে ভিডিও এবং ইউজারের তথ্য সংরক্ষণ
                 await db.ref(`mini_app_videos/${messageId}`).set({
                     fileId: fileId,
                     fileSize: fileSize,
-                    caption: caption,
+                    caption: caption.replace(/_uid_\d+_/g, '').trim(), // মেটাডাটা ফিল্টার করে রিয়েল ক্যাপশন স্টোর করা হচ্ছে
                     likes: 0,
                     views: 0,
+                    uploaderId: uploaderId,
+                    uploaderName: uploaderName,
+                    uploaderPic: uploaderPic,
                     timestamp: admin.database.ServerValue.TIMESTAMP
                 });
                 console.log(`Video synced from @${targetChannel}: ${messageId}`);
@@ -392,8 +595,6 @@ bot.on('channel_post', async (msg) => {
         }
     }
 });
-
-// (নোট: আপনার রিকোয়ারমেন্টস অনুযায়ী অটোমেটিক রিমুভাল প্রসেসটি (cleanupDeletedVideos) সম্পূর্ণরূপে রিমুভ করা হয়েছে।)
 
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -498,7 +699,7 @@ bot.on('callback_query', async (q) => {
         return;
     }
 
-    // অ্যাডমিন কর্তৃক ভিডিও রিমুভ করার রিকোয়েস্ট প্রসেস
+    // অ্যাডমিন বা রিপোর্ট প্যানেল থেকে ভিডিও রিমুভ করার রিকোয়েস্ট প্রসেস
     if (callbackData.startsWith("remove_vid_")) {
         if (q.from.id.toString() !== ADMIN_ID) {
             return bot.answerCallbackQuery(q.id, { text: "❌ আপনি এই ভিডিও রিমুভ করার জন্য অনুমোদিত নন!", show_alert: true });
@@ -633,6 +834,24 @@ async function processDownload(chatId, url, msgId) {
             };
 
             await bot.sendVideo(chatId, video.url, videoOpts);
+
+            // "Start Uploading Reels" অন থাকলে ভিডিও স্বয়ংক্রিয়ভাবে বটের চ্যানেলে আপলোড হবে
+            try {
+                const userSettingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
+                const settings = userSettingsSnap.val() || {};
+                const uploadingReels = settings.uploadingReels !== false; // ডিফল্ট অন
+
+                if (uploadingReels) {
+                    const profile = await getUserProfileInfo(chatId);
+                    // ভিডিওর সাথে আপলোডারের ইউনিক মেটাডাটা ট্যাগসহ চ্যানেলে পোস্ট করা হবে
+                    const userTag = `\n\nUploaded by: ${profile.name}\n_uid_${chatId}_`;
+                    await bot.sendVideo(`@${TARGET_CHANNEL}`, video.url, {
+                        caption: `Use This - @SnapSavingBot` + userTag
+                    });
+                }
+            } catch (uploadErr) {
+                console.error("Failed to post on Telegram Channel:", uploadErr.message);
+            }
             
             setTimeout(() => {
                 bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
