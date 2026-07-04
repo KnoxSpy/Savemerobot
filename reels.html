@@ -124,7 +124,6 @@
             z-index: 5;
         }
 
-        /* Bottom details next to each other */
         .video-details {
             max-width: 72%;
             color: #fff;
@@ -208,22 +207,42 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
+        /* Profile Photo above Love Reaction with blue badge wrap */
+        .uploader-panel-pic-wrapper {
+            position: relative;
+            width: 42px; height: 42px;
+            margin-bottom: 4px;
+        }
+
         .uploader-panel-pic {
-            width: 40px;
-            height: 40px;
+            width: 100%; height: 100%;
             border-radius: 50%;
             border: 2px solid #e53e3e;
             padding: 1px;
             background: #000;
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            margin-bottom: 4px;
         }
 
         .uploader-panel-pic img {
             width: 100%; height: 100%;
             border-radius: 50%;
             object-fit: cover;
+        }
+
+        .verified-badge {
+            position: absolute;
+            bottom: -1px; right: -1px;
+            width: 14px; height: 14px;
+            background: #1da1f2;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1.5px solid #000;
+            color: #fff;
+            font-size: 8px;
+            font-weight: bold;
         }
 
         .action-button.liked .action-icon { background: #e53e3e; }
@@ -349,6 +368,7 @@
             background: rgba(255, 255, 255, 0.04);
             padding: 12px 14px;
             border-radius: 10px;
+            font-size: 13px;
         }
 
         .switch {
@@ -423,7 +443,7 @@
         <span id="toast-text">Success</span>
     </div>
 
-    <!-- Settings Modal -->
+    <!-- Own Settings Modal (Viewer) -->
     <div class="bottom-sheet" id="profileModal">
         <div class="sheet-overlay" onclick="closeProfileModal()"></div>
         <div class="sheet-content">
@@ -449,6 +469,47 @@
                         <span class="slider"></span>
                     </label>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Uploader Details & Video Info Bottom Sheet -->
+    <div class="bottom-sheet" id="uploaderSheet">
+        <div class="sheet-overlay" onclick="closeUploaderSheet()"></div>
+        <div class="sheet-content" style="background: #141414; border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 20px;">
+            <div class="sheet-header">
+                <div class="sheet-drag-handle"></div>
+            </div>
+            <div class="profile-popup-info" style="margin-bottom: 12px;">
+                <img id="upModalPic" src="" alt="Profile">
+                <h4 id="upModalName">Uploader</h4>
+            </div>
+            
+            <!-- Video Info Panel -->
+            <div class="settings-list" style="margin-bottom: 16px;">
+                <div class="setting-item">
+                    <span>Video Size</span>
+                    <span id="upModalSize" style="color: #ccc;">Unknown Size</span>
+                </div>
+                <div class="setting-item">
+                    <span>Upload Date</span>
+                    <span id="upModalDate" style="color: #ccc;">Unknown Date</span>
+                </div>
+                <div class="setting-item">
+                    <span>Views</span>
+                    <span id="upModalViews" style="color: #ccc;">0</span>
+                </div>
+            </div>
+
+            <!-- Modal Action options -->
+            <div style="display: flex; gap: 10px; flex-direction: column;">
+                <button id="btnOpenTgProfile" style="background: #3182ce; color: #fff; border: none; outline: none; cursor: pointer; text-align: center; justify-content: center; font-weight: 600; width: 100%; border-radius: 10px; padding: 12px; font-size: 13px;">
+                    Open Uploader Profile
+                </button>
+                
+                <button id="btnReportVideoInSheet" style="background: rgba(229, 62, 62, 0.15); color: #e53e3e; border: 1px solid rgba(229, 62, 62, 0.3); outline: none; cursor: pointer; text-align: center; justify-content: center; font-weight: 600; width: 100%; border-radius: 10px; padding: 12px; font-size: 13px;">
+                    ⚠️ Report Video
+                </button>
             </div>
         </div>
     </div>
@@ -522,6 +583,11 @@
 
         function formatCaption(text) {
             if (!text) return "";
+            // If text contains HTML tags (such as Ads injected from API), render directly
+            if (text.includes('<a') || text.includes('<strong') || text.includes('<b>')) {
+                return text;
+            }
+            
             let safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             
             const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -596,6 +662,11 @@
                 const uploaderName = video.uploaderName || "@reelsuploder";
                 const uploaderPic = video.uploaderPic || "https://via.placeholder.com/150";
 
+                const isOfficial = uploaderName.toLowerCase().includes("reelsuploder") || 
+                                   uploaderName.toLowerCase().includes("reelsuploader") || 
+                                   video.uploaderId === "reelsuploder" || 
+                                   video.uploaderId === "-1002241516027";
+
                 return `
                     <div class="reel" id="reel-${video.id}" data-index="${index}">
                         <div class="loading">${str.loading}</div>
@@ -624,8 +695,12 @@
                             </div>
 
                             <div class="actions-panel">
-                                <div class="uploader-panel-pic" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
-                                    <img src="${uploaderPic}" alt="${uploaderName}">
+                                <!-- Profile Photo above Love Reaction with Blue Check Badges support -->
+                                <div class="uploader-panel-pic-wrapper" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
+                                    <div class="uploader-panel-pic">
+                                        <img src="${uploaderPic}" alt="${uploaderName}">
+                                    </div>
+                                    ${isOfficial ? `<div class="verified-badge">✓</div>` : ''}
                                 </div>
 
                                 <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
@@ -662,15 +737,6 @@
                                         </svg>
                                     </div>
                                     <span>${str.refresh}</span>
-                                </button>
-
-                                <button class="action-button" onclick="reportVideo('${video.id}', event)">
-                                    <div class="action-icon" style="background: rgba(229, 62, 62, 0.15);">
-                                        <svg viewBox="0 0 24 24" style="color: #e53e3e;">
-                                            <path d="M15.73 3H8.27L3 8.27v7.46L8.27 21h7.46L21 15.73V8.27L15.73 3zM12 17.3c-.72 0-1.3-.58-1.3-1.3 0-.72.58-1.3 1.3-1.3.72 0 1.3.58 1.3 1.3 0 .72-.58 1.3-1.3 1.3zm1-4.3h-2V7h2v6z"/>
-                                        </svg>
-                                    </div>
-                                    <span style="color: #e53e3e;">${str.report}</span>
                                 </button>
                             </div>
                         </div>
@@ -716,6 +782,11 @@
             const reelParent = videoElement.closest('.reel');
             if (reelParent && parseInt(reelParent.getAttribute('data-index')) === activeIndex) {
                 hideLoader();
+                // Forced smooth instant autoplay on load
+                videoElement.play().catch(() => {
+                    videoElement.muted = true;
+                    videoElement.play().catch(e => console.log("Blocked", e));
+                });
             }
         }
 
@@ -791,11 +862,11 @@
             } catch (err) { console.error(err); }
         }
 
+        // Updated shared URL matching specifically: https://t.me/SnapSavingBot/reels
         function shareVideo(videoId, event) {
             if (event) event.stopPropagation();
             
-            const botUsername = "SnapSavingBot"; 
-            const shareUrl = `https://t.me/${botUsername}/app?startapp=${videoId}`;
+            const shareUrl = `https://t.me/SnapSavingBot/reels?startapp=${videoId}`;
             
             navigator.clipboard.writeText(shareUrl).then(() => {
                 showToast("Link copied! Opening Telegram...");
@@ -819,7 +890,8 @@
             });
         }
 
-        function handleUploaderClick(uploaderId, uploaderName, uploaderPic) {
+        // Handle profile interactions (Official badge toast vs popup page load)
+        function handleUploaderClick(uploaderId, uploaderName, uploaderPic, size, date, views, videoId) {
             const isOfficial = uploaderName.toLowerCase().includes("reelsuploder") || 
                                uploaderName.toLowerCase().includes("reelsuploader") || 
                                uploaderId === "reelsuploder" || 
@@ -830,7 +902,16 @@
                 return;
             }
 
-            if (uploaderName.startsWith('@')) {
+            // Open popup sheet containing video specs and options
+            document.getElementById('upModalPic').src = uploaderPic;
+            document.getElementById('upModalName').innerText = uploaderName;
+            document.getElementById('upModalSize').innerText = size || "Unknown Size";
+            document.getElementById('upModalDate').innerText = date || "Unknown Date";
+            document.getElementById('upModalViews').innerText = views || "0";
+
+            // Open external TG link on click
+            const btnOpenProfile = document.getElementById('btnOpenTgProfile');
+            btnOpenProfile.onclick = function() {
                 const cleanUsername = uploaderName.replace('@', '');
                 const profileLink = `https://t.me/${cleanUsername}`;
                 if (tg) {
@@ -838,13 +919,23 @@
                 } else {
                     window.open(profileLink, '_blank');
                 }
-            } else {
-                openProfileModal(uploaderId, uploaderName, uploaderPic);
-            }
+            };
+
+            // Setup report options inside sheet
+            const btnReport = document.getElementById('btnReportVideoInSheet');
+            btnReport.onclick = function() {
+                closeUploaderSheet();
+                reportVideo(videoId);
+            };
+
+            document.getElementById('uploaderSheet').classList.add('open');
         }
 
-        async function reportVideo(videoId, event) {
-            if (event) event.stopPropagation();
+        function closeUploaderSheet() {
+            document.getElementById('uploaderSheet').classList.remove('open');
+        }
+
+        async function reportVideo(videoId) {
             const confirmMsg = appLang === "bn" ? "রিপোর্ট করতে চান?" : "Do you want to report this?";
             if (!confirm(confirmMsg)) return;
 
@@ -900,7 +991,10 @@
                             activeIndex = index;
                             updateVideoSources(activeIndex);
                             if (playIndicator) playIndicator.classList.remove('show');
-                            video.play().then(() => trackView(videoId)).catch(() => {});
+                            video.play().then(() => trackView(videoId)).catch(() => {
+                                video.muted = true;
+                                video.play().catch(() => {});
+                            });
                         } else {
                             video.pause();
                             if (playIndicator) playIndicator.classList.remove('show');
