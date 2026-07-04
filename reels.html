@@ -17,6 +17,41 @@
             width: 100vw;
         }
 
+        /* App-wide Elegant Loading Screen */
+        #app-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.4s ease, visibility 0.4s;
+        }
+
+        .tiktok-style-logo {
+            width: 80px;
+            height: 80px;
+            animation: pulseGlow 1.6s infinite ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(0.9); opacity: 0.7; filter: drop-shadow(0 0 8px rgba(229, 62, 62, 0.6)); }
+            50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 20px rgba(49, 130, 206, 0.8)); }
+            100% { transform: scale(0.9); opacity: 0.7; filter: drop-shadow(0 0 8px rgba(229, 62, 62, 0.6)); }
+        }
+
+        .loader-text {
+            margin-top: 20px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 1px;
+        }
+
         /* Video Container and Sharp rendering */
         .reels-container {
             height: 100vh;
@@ -46,13 +81,35 @@
             object-fit: contain;
             opacity: 0;
             transition: opacity 0.3s ease-in-out;
-            /* Enhance video rendering clarity */
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
         }
 
         video.loaded {
             opacity: 1;
+        }
+
+        /* Play/Pause Indicator Overlay */
+        .play-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1.5);
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 50%;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 8;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .play-indicator.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
         }
 
         /* Overlay Layout */
@@ -112,14 +169,21 @@
             font-size: 13px;
             opacity: 0.85;
             line-height: 1.35;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
 
-        /* Actions Panel - Smaller & Elegant Icons */
+        /* Clickable link inside details */
+        .caption-link {
+            color: #3182ce;
+            text-decoration: none;
+            font-weight: 600;
+            pointer-events: auto;
+        }
+        .caption-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Actions Panel */
         .actions-panel {
             display: flex;
             flex-direction: column;
@@ -161,7 +225,6 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
-        /* Action Panel Uploader Circle */
         .uploader-panel-pic {
             width: 40px;
             height: 40px;
@@ -172,6 +235,7 @@
             cursor: pointer;
             transition: transform 0.2s;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            margin-bottom: 4px;
         }
         .uploader-panel-pic:active {
             transform: scale(0.9);
@@ -199,7 +263,7 @@
             fill: currentColor;
         }
 
-        /* Professional 3D Heart Pop Animation */
+        /* Heart Pop Animation */
         .heart-pop {
             position: absolute;
             top: 50%;
@@ -384,6 +448,16 @@
 </head>
 <body>
 
+    <!-- Animated Loading Screen HTML -->
+    <div id="app-loader">
+        <!-- TikTok-style animated SVG icon -->
+        <svg class="tiktok-style-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.589 12.55c-1.8 0-3.45-.69-4.7-1.83V17c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6c.3 0 .59.03.88.08V13.2c-.29-.07-.58-.1-.88-.1-2.15 0-3.9 1.75-3.9 3.9s1.75 3.9 3.9 3.9 3.9-1.75 3.9-3.9v-13h2.12c.38 2.61 2.63 4.65 5.37 4.65V6.45c-1.42 0-2.63-.84-3.2-2.05H14.19v9.12c1.07.65 2.33 1.03 3.69 1.03h1.71v-2h-1.71z" fill="#00f2fe"/>
+            <path d="M19.589 11.55c-1.8 0-3.45-.69-4.7-1.83V16c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6c.3 0 .59.03.88.08V12.2c-.29-.07-.58-.1-.88-.1-2.15 0-3.9 1.75-3.9 3.9s1.75 3.9 3.9 3.9 3.9-1.75 3.9-3.9v-13h2.12c.38 2.61 2.63 4.65 5.37 4.65V5.45c-1.42 0-2.63-.84-3.2-2.05H14.19v9.12c1.07.65 2.33 1.03 3.69 1.03h1.71v-2h-1.71z" fill="#fe0979" style="mix-blend-mode: screen;"/>
+        </svg>
+        <div class="loader-text" id="loaderText">লোডিং হচ্ছে...</div>
+    </div>
+
     <div class="reels-container" id="reelsContainer">
         <!-- Videos will be injected dynamically here -->
     </div>
@@ -403,14 +477,14 @@
                 <div class="setting-item">
                     <span id="txt-upload">Start Uploading Reels</span>
                     <label class="switch">
-                        <input type="checkbox" id="uploadToggle" onchange="updateProfileSetting('uploading')">
+                        <input type="checkbox" id="uploadToggle" onchange="updateProfileSetting()">
                         <span class="slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span id="txt-notify">Notifications</span>
                     <label class="switch">
-                        <input type="checkbox" id="notificationToggle" onchange="updateProfileSetting('notifications')">
+                        <input type="checkbox" id="notificationToggle" onchange="updateProfileSetting()">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -444,7 +518,8 @@
                 no_caption: "কোনো ক্যাপশন দেওয়া হয়নি।",
                 loading: "লোডিং হচ্ছে...",
                 upload_reels: "রিল আপলোড চালু রাখুন",
-                notifications: "বিজ্ঞপ্তি/নোটিফিকেশন"
+                notifications: "বিজ্ঞপ্তি/নোটিফিকেশন",
+                fetching: "ভিডিও প্রস্তুত করা হচ্ছে..."
             },
             en: {
                 save: "Save",
@@ -453,7 +528,8 @@
                 no_caption: "No caption provided.",
                 loading: "Loading...",
                 upload_reels: "Start Uploading Reels",
-                notifications: "Notifications"
+                notifications: "Notifications",
+                fetching: "Fetching Videos..."
             }
         };
 
@@ -466,7 +542,38 @@
             } catch (err) {
                 console.error("Lang fetch failed", err);
             }
+            // সেটআপ ট্রান্সলেশন
+            document.getElementById('loaderText').innerText = uiStrings[appLang].fetching;
             fetchVideos();
+        }
+
+        // ক্যাপশন ফরম্যাটিং করার ফাংশন (লিংক, বোল্ড এবং ইউজারনেম ক্লিকযোগ্য করার জন্য)
+        function formatCaption(text) {
+            if (!text) return "";
+            
+            // HTML ট্যাগ প্রতিরোধ করা
+            let safeText = text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+
+            // URL লিংক রূপান্তর
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            safeText = safeText.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" class="caption-link" onclick="event.stopPropagation();">${url}</a>`;
+            });
+
+            // টেলিগ্রাম ইউজারনেম (@username) রূপান্তর
+            const mentionRegex = /@([a-zA-Z0-9_]{5,32})/g;
+            safeText = safeText.replace(mentionRegex, function(mention, username) {
+                return `<a href="https://t.me/${username}" target="_blank" class="caption-link" onclick="event.stopPropagation();">${mention}</a>`;
+            });
+
+            // বোল্ড ফরম্যাটিং (**text** বা *text*)
+            safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            safeText = safeText.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+
+            return safeText;
         }
 
         async function fetchVideos() {
@@ -488,21 +595,31 @@
                 }
                 
                 videos = data.videos || [];
+
+                // নতুন আপলোড করা ভিডিওগুলোকে ফিডে প্রথমে দেখানোর জন্য সাজানো
+                videos.sort((a, b) => {
+                    const dateA = a.createdAt ? new Date(a.createdAt) : parseInt(a.id) || 0;
+                    const dateB = b.createdAt ? new Date(b.createdAt) : parseInt(b.id) || 0;
+                    return dateB - dateA; // Newest First
+                });
+
                 renderVideos();
             } catch (err) {
                 console.error("Failed to load videos", err);
+                hideLoader();
             }
         }
 
         function renderVideos() {
             if (videos.length === 0) {
                 container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100vh;">কোনো নতুন ভিডিও পাওয়া যায়নি।</div>`;
+                hideLoader();
                 return;
             }
 
             const str = uiStrings[appLang];
 
-            // সেটআপ ট্রান্সলেশন অন মডাল লোড
+            // মডাল টেক্সট আপডেট
             document.getElementById('txt-upload').innerText = str.upload_reels;
             document.getElementById('txt-notify').innerText = str.notifications;
 
@@ -517,7 +634,15 @@
                 return `
                     <div class="reel" id="reel-${video.id}" data-index="${index}">
                         <div class="loading">${str.loading}</div>
-                        <video src="${streamUrl}" loop playsinline webkit-playsinline preload="metadata" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
+                        
+                        <!-- Play/Pause Indicator Element -->
+                        <div class="play-indicator">
+                            <svg viewBox="0 0 24 24" width="36" height="36" fill="#fff">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                        </div>
+
+                        <video src="${streamUrl}" loop playsinline webkit-playsinline preload="auto" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
                         
                         <div class="heart-pop" id="heart-pop-${video.id}">
                             <svg viewBox="0 0 24 24" width="70" height="70" fill="currentColor">
@@ -526,16 +651,17 @@
                         </div>
 
                         <div class="overlay">
+                            <!-- Bottom Detail displays current Telegram user (viewer) who opened the bot -->
                             <div class="video-details">
-                                <div class="uploader-info" onclick="openProfileModal('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
-                                    <img src="${uploaderPic}" alt="${uploaderName}">
-                                    <h3>${uploaderName}</h3>
+                                <div class="uploader-info" onclick="openProfileModal('${currentUser.id}', '${currentUser.username}', '${currentUser.photo}')">
+                                    <img src="${currentUser.photo}" alt="${currentUser.username}">
+                                    <h3>${currentUser.username} (You)</h3>
                                 </div>
-                                <p>${video.caption || str.no_caption}</p>
+                                <p>${formatCaption(video.caption) || str.no_caption}</p>
                             </div>
 
                             <div class="actions-panel">
-                                <!-- Profile Photo above Love Reaction (Dynamic Pic) -->
+                                <!-- Profile Photo above Love Reaction displays Video Creator -->
                                 <div class="uploader-panel-pic" onclick="openProfileModal('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
                                     <img src="${uploaderPic}" alt="${uploaderName}">
                                 </div>
@@ -570,7 +696,7 @@
                                     <span>${str.save}</span>
                                 </button>
 
-                                <!-- Referring Icon -->
+                                <!-- Refresh Button -->
                                 <button class="action-button" onclick="refreshFeed(event)">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
@@ -599,17 +725,53 @@
             setupDoubleTap();
         }
 
+        // প্রথম ভিডিও লোড হওয়ার পর স্ক্রিন রিভিল হবে
         function videoLoaded(videoElement) {
             videoElement.classList.add('loaded');
             const loadingText = videoElement.parentElement.querySelector('.loading');
             if (loadingText) loadingText.style.display = 'none';
+            
+            // প্রথম ভিডিও প্রস্তুত হলেই লোডার চলে যাবে
+            const reelParent = videoElement.closest('.reel');
+            if (reelParent && reelParent.getAttribute('data-index') === '0') {
+                hideLoader();
+            }
         }
 
+        function hideLoader() {
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => {
+                    loader.style.visibility = 'hidden';
+                }, 400);
+            }
+        }
+
+        // প্লে/পজ ইন্ডিকেটর সহ কন্ট্রোল
         function togglePlay(video) {
+            const parent = video.parentElement;
+            const playIndicator = parent.querySelector('.play-indicator');
+            
             if (video.paused) {
-                video.play().catch(e => console.log("Blocked"));
+                video.play().then(() => {
+                    if (playIndicator) {
+                        playIndicator.classList.remove('show');
+                    }
+                }).catch(e => console.log("Play failed", e));
             } else {
                 video.pause();
+                if (playIndicator) {
+                    playIndicator.classList.add('show');
+                    // পজ ইন্ডিকেটরটি ২ সেকেন্ড পর নিজে থেকেই অদৃশ্য করার ব্যাকআপ
+                    setTimeout(() => {
+                        if (video.paused && playIndicator.classList.contains('show')) {
+                            // keeps showing while paused
+                        } else {
+                            playIndicator.classList.remove('show');
+                        }
+                    }, 2000);
+                }
             }
         }
 
@@ -723,6 +885,12 @@
 
         function refreshFeed(event) {
             if (event) event.stopPropagation();
+            // রিলোড করার আগে লোদ স্ক্রিন ফিরিয়ে আনা
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.style.visibility = 'visible';
+                loader.style.opacity = '1';
+            }
             fetchVideos();
         }
 
@@ -732,12 +900,15 @@
                 entries.forEach(entry => {
                     const video = entry.target.querySelector('video');
                     const videoId = entry.target.id.replace('reel-', '');
+                    const playIndicator = entry.target.querySelector('.play-indicator');
                     if (video) {
                         if (entry.isIntersecting) {
+                            if (playIndicator) playIndicator.classList.remove('show');
                             video.play().then(() => trackView(videoId)).catch(() => {});
                         } else {
                             video.pause();
                             video.currentTime = 0;
+                            if (playIndicator) playIndicator.classList.remove('show');
                         }
                     }
                 });
@@ -748,7 +919,10 @@
         function setupDoubleTap() {
             document.querySelectorAll('.reel').forEach(reel => {
                 let lastTap = 0;
-                reel.addEventListener('click', function() {
+                reel.addEventListener('click', function(e) {
+                    // ক্যাপশন লিংক ক্লিক করলে ডাবল ট্যাপ ব্লক করা
+                    if (e.target.classList.contains('caption-link')) return;
+
                     const currentTime = new Date().getTime();
                     const tapLength = currentTime - lastTap;
                     if (tapLength < 300 && tapLength > 0) {
@@ -770,16 +944,29 @@
             document.getElementById('modalProfileName').innerText = uploaderName;
             document.getElementById('modalProfilePic').src = uploaderPic;
 
+            // টগলগুলোর ডিফল্ট রূপ নির্ধারণ
+            let uploadingChecked = true;
+            let notificationChecked = true;
+
             try {
                 const res = await fetch(`/api/user/settings?userId=${uploaderId}`);
-                const settings = await res.json();
-                document.getElementById('uploadToggle').checked = settings.uploadingReels !== false;
-                document.getElementById('notificationToggle').checked = settings.notifications !== false;
+                if (res.ok) {
+                    const settings = await res.json();
+                    uploadingChecked = settings.uploadingReels !== false;
+                    notificationChecked = settings.notifications !== false;
+                } else {
+                    throw new Error();
+                }
             } catch (err) {
-                document.getElementById('uploadToggle').checked = localStorage.getItem(`setting_upload_${uploaderId}`) !== 'false';
-                document.getElementById('notificationToggle').checked = localStorage.getItem(`setting_notify_${uploaderId}`) !== 'false';
+                // অফলাইন বা লোকাল স্টোরেজ ব্যাকআপ
+                uploadingChecked = localStorage.getItem(`setting_upload_${uploaderId}`) !== 'false';
+                notificationChecked = localStorage.getItem(`setting_notify_${uploaderId}`) !== 'false';
             }
 
+            document.getElementById('uploadToggle').checked = uploadingChecked;
+            document.getElementById('notificationToggle').checked = notificationChecked;
+
+            // শুধুমাত্র নিজের প্রোফাইল হলে সেটিংস অন/অফ করতে দেয়া হবে
             if (uploaderId !== currentUser.id) {
                 document.getElementById('uploadToggle').disabled = true;
                 document.getElementById('notificationToggle').disabled = true;
@@ -787,6 +974,7 @@
                 document.getElementById('uploadToggle').disabled = false;
                 document.getElementById('notificationToggle').disabled = false;
             }
+            
             document.getElementById('profileModal').classList.add('open');
         }
 
@@ -794,10 +982,15 @@
             document.getElementById('profileModal').classList.remove('open');
         }
 
+        // সেটিংস সফলভাবে লোকালস্টোরেজ এবং সার্ভারে আপডেট করার মেথড
         async function updateProfileSetting() {
             if (activeProfileUserId !== currentUser.id) return;
             const uploadingVal = document.getElementById('uploadToggle').checked;
             const notificationVal = document.getElementById('notificationToggle').checked;
+
+            // সাথে সাথে লোকালস্টোরেজে আপডেট যাতে ল্যাগ ছাড়া টগল কাজ করে
+            localStorage.setItem(`setting_upload_${currentUser.id}`, uploadingVal);
+            localStorage.setItem(`setting_notify_${currentUser.id}`, notificationVal);
 
             try {
                 await fetch('/api/user/settings', {
@@ -810,7 +1003,7 @@
                     })
                 });
             } catch (err) {
-                console.error(err);
+                console.error("Failed to sync settings with server", err);
             }
         }
 
