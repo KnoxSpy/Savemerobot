@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>SnavSaving Shorts</title>
+    <title>SnapSaving Shorts</title>
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -17,42 +17,40 @@
             width: 100vw;
         }
 
-        /* App-wide Elegant Loading Screen */
+        /* App Loading Screen */
         #app-loader {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
             background-color: #000;
             z-index: 9999;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: opacity 0.4s ease, visibility 0.4s;
+            transition: opacity 0.3s ease, visibility 0.3s;
         }
 
         .tiktok-style-logo {
             width: 80px;
             height: 80px;
-            animation: pulseGlow 1.6s infinite ease-in-out;
+            animation: pulseGlow 1.4s infinite ease-in-out;
         }
 
         @keyframes pulseGlow {
-            0% { transform: scale(0.9); opacity: 0.7; filter: drop-shadow(0 0 8px rgba(229, 62, 62, 0.6)); }
-            50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 20px rgba(49, 130, 206, 0.8)); }
-            100% { transform: scale(0.9); opacity: 0.7; filter: drop-shadow(0 0 8px rgba(229, 62, 62, 0.6)); }
+            0% { transform: scale(0.9); filter: drop-shadow(0 0 5px rgba(229, 62, 62, 0.5)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 15px rgba(49, 130, 206, 0.7)); }
+            100% { transform: scale(0.9); filter: drop-shadow(0 0 5px rgba(229, 62, 62, 0.5)); }
         }
 
         .loader-text {
-            margin-top: 20px;
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.7);
-            letter-spacing: 1px;
+            margin-top: 18px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 0.8px;
         }
 
-        /* Video Container and Sharp rendering */
+        /* High-Performance Container with GPU Acceleration */
         .reels-container {
             height: 100vh;
             width: 100vw;
@@ -61,6 +59,7 @@
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
             transform: translate3d(0, 0, 0);
+            will-change: transform;
         }
 
         .reel {
@@ -73,6 +72,7 @@
             align-items: center;
             justify-content: center;
             background: #000;
+            will-change: transform;
         }
 
         video {
@@ -80,31 +80,29 @@
             height: 100%;
             object-fit: contain;
             opacity: 0;
-            transition: opacity 0.3s ease-in-out;
+            transition: opacity 0.2s ease-in-out;
             image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
         }
 
         video.loaded {
             opacity: 1;
         }
 
-        /* Play/Pause Indicator Overlay */
+        /* Play/Pause Central Indicator Overlay */
         .play-indicator {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(1.5);
-            background: rgba(0, 0, 0, 0.6);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(1.4);
+            background: rgba(0, 0, 0, 0.5);
             border-radius: 50%;
-            padding: 16px;
+            padding: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 0;
             pointer-events: none;
             z-index: 8;
-            transition: opacity 0.2s ease, transform 0.2s ease;
+            transition: opacity 0.15s ease, transform 0.15s ease;
         }
 
         .play-indicator.show {
@@ -112,14 +110,13 @@
             transform: translate(-50%, -50%) scale(1);
         }
 
-        /* Overlay Layout */
+        /* Overlay Interface Layer */
         .overlay {
             position: absolute;
-            bottom: 0;
-            left: 0;
+            bottom: 0; left: 0;
             width: 100%;
             padding: 60px 16px 30px 16px;
-            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            background: linear-gradient(transparent, rgba(0,0,0,0.85));
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
@@ -127,7 +124,7 @@
             z-index: 5;
         }
 
-        /* Bottom Profile details next to each other */
+        /* Bottom details next to each other */
         .video-details {
             max-width: 72%;
             color: #fff;
@@ -142,12 +139,6 @@
             align-items: center;
             gap: 8px;
             cursor: pointer;
-            animation: elegantSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        @keyframes elegantSlide {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .uploader-info img {
@@ -156,31 +147,24 @@
             border-radius: 50%;
             border: 1.5px solid rgba(255, 255, 255, 0.8);
             object-fit: cover;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
 
         .uploader-info h3 {
             font-size: 14px;
             font-weight: 600;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
         }
 
         .video-details p {
             font-size: 13px;
             opacity: 0.85;
             line-height: 1.35;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
 
-        /* Clickable link inside details */
         .caption-link {
             color: #3182ce;
             text-decoration: none;
             font-weight: 600;
             pointer-events: auto;
-        }
-        .caption-link:hover {
-            text-decoration: underline;
         }
 
         /* Actions Panel */
@@ -203,11 +187,11 @@
             align-items: center;
             font-size: 10px;
             font-weight: 500;
-            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: transform 0.1s ease;
         }
 
         .action-button:active {
-            transform: scale(0.88);
+            transform: scale(0.9);
         }
 
         .action-icon {
@@ -219,9 +203,8 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 3px;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            transition: background 0.2s, color 0.2s;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
@@ -233,41 +216,28 @@
             padding: 1px;
             background: #000;
             cursor: pointer;
-            transition: transform 0.2s;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             margin-bottom: 4px;
         }
-        .uploader-panel-pic:active {
-            transform: scale(0.9);
-        }
+
         .uploader-panel-pic img {
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             border-radius: 50%;
             object-fit: cover;
         }
 
-        .action-button.liked .action-icon {
-            background: #e53e3e;
-            color: #fff;
-        }
-
-        .action-button.saved .action-icon {
-            background: #3182ce;
-            color: #fff;
-        }
+        .action-button.liked .action-icon { background: #e53e3e; }
+        .action-button.saved .action-icon { background: #3182ce; }
 
         .action-icon svg {
-            width: 18px;
-            height: 18px;
+            width: 18px; height: 18px;
             fill: currentColor;
         }
 
-        /* Heart Pop Animation */
+        /* 3D Heart Pop */
         .heart-pop {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%) scale(0);
             color: #e53e3e;
             pointer-events: none;
@@ -281,29 +251,20 @@
         }
 
         .pop-active {
-            animation: heartPop 0.75s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            animation: heartPop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
         .loading {
             position: absolute;
             color: rgba(255,255,255,0.7);
             font-size: 13px;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
         }
 
         /* Bottom Sheet Popup Styles */
         .bottom-sheet {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
             z-index: 1000;
             visibility: hidden;
             transition: visibility 0.25s;
@@ -315,10 +276,8 @@
 
         .sheet-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7);
             opacity: 0;
             transition: opacity 0.25s ease;
@@ -330,8 +289,7 @@
 
         .sheet-content {
             position: absolute;
-            bottom: 0;
-            left: 0;
+            bottom: 0; left: 0;
             width: 100%;
             background: #141414;
             border-top-left-radius: 16px;
@@ -340,7 +298,6 @@
             transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
             padding: 20px;
             color: #fff;
-            box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
         }
 
         .bottom-sheet.open .sheet-content {
@@ -354,8 +311,7 @@
         }
 
         .sheet-drag-handle {
-            width: 36px;
-            height: 4px;
+            width: 36px; height: 4px;
             background: #333;
             border-radius: 10px;
         }
@@ -369,8 +325,7 @@
         }
 
         .profile-popup-info img {
-            width: 70px;
-            height: 70px;
+            width: 70px; height: 70px;
             border-radius: 50%;
             border: 2px solid #e53e3e;
             object-fit: cover;
@@ -381,7 +336,6 @@
             font-weight: 600;
         }
 
-        /* Toggle Switches */
         .settings-list {
             display: flex;
             flex-direction: column;
@@ -395,26 +349,15 @@
             background: rgba(255, 255, 255, 0.04);
             padding: 12px 14px;
             border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.02);
-        }
-
-        .setting-item span {
-            font-size: 13px;
-            font-weight: 500;
         }
 
         .switch {
             position: relative;
             display: inline-block;
-            width: 44px;
-            height: 24px;
+            width: 44px; height: 24px;
         }
 
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+        .switch input { opacity: 0; width: 0; height: 0; }
 
         .slider {
             position: absolute;
@@ -428,41 +371,59 @@
         .slider:before {
             position: absolute;
             content: "";
-            height: 16px;
-            width: 16px;
-            left: 4px;
-            bottom: 4px;
+            height: 16px; width: 16px;
+            left: 4px; bottom: 4px;
             background-color: white;
             transition: .25s;
             border-radius: 50%;
         }
 
-        input:checked + .slider {
-            background-color: #38a169;
-        }
+        input:checked + .slider { background-color: #38a169; }
+        input:checked + .slider:before { transform: translateX(20px); }
 
-        input:checked + .slider:before {
-            transform: translateX(20px);
+        /* Custom Toast Notification styling */
+        #custom-toast {
+            position: fixed;
+            bottom: 100px; left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(8px);
         }
     </style>
 </head>
 <body>
 
-    <!-- Animated Loading Screen HTML -->
+    <!-- Animated Loader Screen -->
     <div id="app-loader">
-        <!-- TikTok-style animated SVG icon -->
         <svg class="tiktok-style-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M19.589 12.55c-1.8 0-3.45-.69-4.7-1.83V17c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6c.3 0 .59.03.88.08V13.2c-.29-.07-.58-.1-.88-.1-2.15 0-3.9 1.75-3.9 3.9s1.75 3.9 3.9 3.9 3.9-1.75 3.9-3.9v-13h2.12c.38 2.61 2.63 4.65 5.37 4.65V6.45c-1.42 0-2.63-.84-3.2-2.05H14.19v9.12c1.07.65 2.33 1.03 3.69 1.03h1.71v-2h-1.71z" fill="#00f2fe"/>
             <path d="M19.589 11.55c-1.8 0-3.45-.69-4.7-1.83V16c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6c.3 0 .59.03.88.08V12.2c-.29-.07-.58-.1-.88-.1-2.15 0-3.9 1.75-3.9 3.9s1.75 3.9 3.9 3.9 3.9-1.75 3.9-3.9v-13h2.12c.38 2.61 2.63 4.65 5.37 4.65V5.45c-1.42 0-2.63-.84-3.2-2.05H14.19v9.12c1.07.65 2.33 1.03 3.69 1.03h1.71v-2h-1.71z" fill="#fe0979" style="mix-blend-mode: screen;"/>
         </svg>
-        <div class="loader-text" id="loaderText">লোডিং হচ্ছে...</div>
+        <div class="loader-text" id="loaderText">Loading Videos...</div>
     </div>
 
-    <div class="reels-container" id="reelsContainer">
-        <!-- Videos will be injected dynamically here -->
+    <!-- Container for dynamic reels -->
+    <div class="reels-container" id="reelsContainer"></div>
+
+    <!-- Toast Component -->
+    <div id="custom-toast">
+        <span id="toast-text">Success</span>
     </div>
 
-    <!-- Bottom Sheet Popup HTML -->
+    <!-- Settings Modal -->
     <div class="bottom-sheet" id="profileModal">
         <div class="sheet-overlay" onclick="closeProfileModal()"></div>
         <div class="sheet-content">
@@ -471,7 +432,7 @@
             </div>
             <div class="profile-popup-info">
                 <img id="modalProfilePic" src="https://via.placeholder.com/150" alt="Profile">
-                <h4 id="modalProfileName">ইউজারনেম</h4>
+                <h4 id="modalProfileName">Username</h4>
             </div>
             <div class="settings-list">
                 <div class="setting-item">
@@ -506,11 +467,22 @@
         };
 
         let videos = [];
-        let appLang = "bn"; // Default language
+        let appLang = "en"; // Default default format English
+        let activeIndex = 0;
         const container = document.getElementById('reelsContainer');
 
-        // Localization translations dictionary
         const uiStrings = {
+            en: {
+                save: "Save",
+                refresh: "Refresh",
+                report: "Report",
+                no_caption: "No caption provided.",
+                loading: "Loading...",
+                upload_reels: "Reels Upload Syncing",
+                notifications: "Notifications",
+                fetching: "Preparing Feed...",
+                share: "Share"
+            },
             bn: {
                 save: "সেভ করুন",
                 refresh: "রিফ্রেশ",
@@ -519,57 +491,54 @@
                 loading: "লোডিং হচ্ছে...",
                 upload_reels: "রিল আপলোড চালু রাখুন",
                 notifications: "বিজ্ঞপ্তি/নোটিফিকেশন",
-                fetching: "ভিডিও প্রস্তুত করা হচ্ছে..."
-            },
-            en: {
-                save: "Save",
-                refresh: "Refresh",
-                report: "Report",
-                no_caption: "No caption provided.",
-                loading: "Loading...",
-                upload_reels: "Start Uploading Reels",
-                notifications: "Notifications",
-                fetching: "Fetching Videos..."
+                fetching: "ফিড প্রস্তুত করা হচ্ছে...",
+                share: "শেয়ার"
             }
         };
 
-        // বটের ভাষা সেটিংস রিট্রাইভ করা
+        // Custom Toast mechanism
+        function showToast(message) {
+            const toast = document.getElementById('custom-toast');
+            const toastText = document.getElementById('toast-text');
+            toastText.innerHTML = message;
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(-50%) translateY(0)';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(20px)';
+            }, 2500);
+        }
+
+        // Translation Loader
         async function fetchLanguageAndVideos() {
             try {
                 const res = await fetch(`/api/user/lang?userId=${currentUser.id}`);
                 const data = await res.json();
-                appLang = data.lang || "bn";
+                appLang = data.lang || "en";
             } catch (err) {
                 console.error("Lang fetch failed", err);
             }
-            // সেটআপ ট্রান্সলেশন
             document.getElementById('loaderText').innerText = uiStrings[appLang].fetching;
             fetchVideos();
         }
 
-        // ক্যাপশন ফরম্যাটিং করার ফাংশন (লিংক, বোল্ড এবং ইউজারনেম ক্লিকযোগ্য করার জন্য)
         function formatCaption(text) {
             if (!text) return "";
+            let safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             
-            // HTML ট্যাগ প্রতিরোধ করা
-            let safeText = text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;");
-
-            // URL লিংক রূপান্তর
+            // Link parsing
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             safeText = safeText.replace(urlRegex, function(url) {
                 return `<a href="${url}" target="_blank" class="caption-link" onclick="event.stopPropagation();">${url}</a>`;
             });
 
-            // টেলিগ্রাম ইউজারনেম (@username) রূপান্তর
+            // Mention parsing
             const mentionRegex = /@([a-zA-Z0-9_]{5,32})/g;
             safeText = safeText.replace(mentionRegex, function(mention, username) {
                 return `<a href="https://t.me/${username}" target="_blank" class="caption-link" onclick="event.stopPropagation();">${mention}</a>`;
             });
 
-            // বোল্ড ফরম্যাটিং (**text** বা *text*)
+            // Bold styling
             safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             safeText = safeText.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
 
@@ -579,14 +548,10 @@
         async function fetchVideos() {
             try {
                 let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
-                
                 const response = await fetch('/api/videos', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        userId: currentUser.id,
-                        seenVideos: seenVideos 
-                    })
+                    body: JSON.stringify({ userId: currentUser.id, seenVideos: seenVideos })
                 });
                 
                 const data = await response.json();
@@ -596,12 +561,22 @@
                 
                 videos = data.videos || [];
 
-                // নতুন আপলোড করা ভিডিওগুলোকে ফিডে প্রথমে দেখানোর জন্য সাজানো
+                // Sort newest uploads first
                 videos.sort((a, b) => {
-                    const dateA = a.createdAt ? new Date(a.createdAt) : parseInt(a.id) || 0;
-                    const dateB = b.createdAt ? new Date(b.createdAt) : parseInt(b.id) || 0;
-                    return dateB - dateA; // Newest First
+                    const dateA = a.timestamp ? new Date(a.timestamp) : parseInt(a.id) || 0;
+                    const dateB = b.timestamp ? new Date(b.timestamp) : parseInt(b.id) || 0;
+                    return dateB - dateA;
                 });
+
+                // Deep Linking: If startapp query exists, search & move target video to index 0
+                const startParam = tg?.initDataUnsafe?.start_param;
+                if (startParam) {
+                    const matchedIndex = videos.findIndex(v => String(v.id) === String(startParam));
+                    if (matchedIndex !== -1) {
+                        const matchedVideo = videos.splice(matchedIndex, 1)[0];
+                        videos.unshift(matchedVideo);
+                    }
+                }
 
                 renderVideos();
             } catch (err) {
@@ -612,14 +587,12 @@
 
         function renderVideos() {
             if (videos.length === 0) {
-                container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100vh;">কোনো নতুন ভিডিও পাওয়া যায়নি।</div>`;
+                container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100vh;">No videos available.</div>`;
                 hideLoader();
                 return;
             }
 
             const str = uiStrings[appLang];
-
-            // মডাল টেক্সট আপডেট
             document.getElementById('txt-upload').innerText = str.upload_reels;
             document.getElementById('txt-notify').innerText = str.notifications;
 
@@ -627,22 +600,22 @@
                 const streamUrl = `/api/video/stream/${encodeURIComponent(video.fileId)}`;
                 const isLiked = localStorage.getItem(`liked_${video.id}`) === 'true';
                 const isSaved = localStorage.getItem(`saved_${video.id}`) === 'true';
-                
-                const uploaderName = video.uploaderName || "@reelsuploader";
+                const uploaderName = video.uploaderName || "@reelsuploder";
                 const uploaderPic = video.uploaderPic || "https://via.placeholder.com/150";
 
                 return `
                     <div class="reel" id="reel-${video.id}" data-index="${index}">
                         <div class="loading">${str.loading}</div>
                         
-                        <!-- Play/Pause Indicator Element -->
+                        <!-- Middle Playback Feedback Indicator -->
                         <div class="play-indicator">
                             <svg viewBox="0 0 24 24" width="36" height="36" fill="#fff">
                                 <path d="M8 5v14l11-7z"/>
                             </svg>
                         </div>
 
-                        <video src="${streamUrl}" loop playsinline webkit-playsinline preload="auto" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
+                        <!-- Lazy loading via data-src to optimize webview performance -->
+                        <video data-src="${streamUrl}" loop playsinline webkit-playsinline preload="none" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
                         
                         <div class="heart-pop" id="heart-pop-${video.id}">
                             <svg viewBox="0 0 24 24" width="70" height="70" fill="currentColor">
@@ -651,7 +624,7 @@
                         </div>
 
                         <div class="overlay">
-                            <!-- Bottom Detail displays current Telegram user (viewer) who opened the bot -->
+                            <!-- Bottom Detail displays Client User (Viewer) profile details -->
                             <div class="video-details">
                                 <div class="uploader-info" onclick="openProfileModal('${currentUser.id}', '${currentUser.username}', '${currentUser.photo}')">
                                     <img src="${currentUser.photo}" alt="${currentUser.username}">
@@ -661,12 +634,12 @@
                             </div>
 
                             <div class="actions-panel">
-                                <!-- Profile Photo above Love Reaction displays Video Creator -->
-                                <div class="uploader-panel-pic" onclick="openProfileModal('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
+                                <!-- Profile Pic above Love Reaction shows Video Uploader details -->
+                                <div class="uploader-panel-pic" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
                                     <img src="${uploaderPic}" alt="${uploaderName}">
                                 </div>
 
-                                <!-- Love Button -->
+                                <!-- Love Icon -->
                                 <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
@@ -676,7 +649,7 @@
                                     <span id="like-count-${video.id}">${video.likes || 0}</span>
                                 </button>
 
-                                <!-- Views Button -->
+                                <!-- Views Counter -->
                                 <div class="action-button" style="pointer-events: none;">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
@@ -696,7 +669,17 @@
                                     <span>${str.save}</span>
                                 </button>
 
-                                <!-- Refresh Button -->
+                                <!-- Share Button (Direct Deep-link Generation) -->
+                                <button class="action-button" onclick="shareVideo('${video.id}', event)">
+                                    <div class="action-icon" style="background: rgba(49, 130, 206, 0.2);">
+                                        <svg viewBox="0 0 24 24" style="color: #3182ce;">
+                                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                                        </svg>
+                                    </div>
+                                    <span style="color: #3182ce;">${str.share}</span>
+                                </button>
+
+                                <!-- Refresh Feed -->
                                 <button class="action-button" onclick="refreshFeed(event)">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
@@ -705,35 +688,50 @@
                                     </div>
                                     <span>${str.refresh}</span>
                                 </button>
-
-                                <!-- Report Button -->
-                                <button class="action-button" onclick="reportVideo('${video.id}', event)">
-                                    <div class="action-icon" style="background: rgba(229, 62, 62, 0.15);">
-                                        <svg viewBox="0 0 24 24" style="color: #e53e3e;">
-                                            <path d="M15.73 3H8.27L3 8.27v7.46L8.27 21h7.46L21 15.73V8.27L15.73 3zM12 17.3c-.72 0-1.3-.58-1.3-1.3 0-.72.58-1.3 1.3-1.3.72 0 1.3.58 1.3 1.3 0 .72-.58 1.3-1.3 1.3zm1-4.3h-2V7h2v6z"/>
-                                        </svg>
-                                    </div>
-                                    <span style="color: #e53e3e;">${str.report}</span>
-                                </button>
                             </div>
                         </div>
                     </div>
                 `;
             }).join('');
 
+            updateVideoSources(0);
             setupIntersectionObserver();
             setupDoubleTap();
         }
 
-        // প্রথম ভিডিও লোড হওয়ার পর স্ক্রিন রিভিল হবে
+        // Virtualized Source Swapping to optimize mobile WebView performance and prevent memory overflow
+        function updateVideoSources(currentIndex) {
+            const reels = document.querySelectorAll('.reel');
+            reels.forEach((reel, i) => {
+                const video = reel.querySelector('video');
+                if (!video) return;
+                const realSrc = video.getAttribute('data-src');
+
+                if (i >= currentIndex - 1 && i <= currentIndex + 1) {
+                    if (!video.src || video.src === "" || !video.src.includes(realSrc)) {
+                        video.src = realSrc;
+                        video.load();
+                    }
+                } else {
+                    if (video.src && video.src !== "") {
+                        video.pause();
+                        video.removeAttribute('src'); // Complete memory unload
+                        video.load();
+                        video.classList.remove('loaded');
+                        const loadingText = reel.querySelector('.loading');
+                        if (loadingText) loadingText.style.display = 'block';
+                    }
+                }
+            });
+        }
+
         function videoLoaded(videoElement) {
             videoElement.classList.add('loaded');
             const loadingText = videoElement.parentElement.querySelector('.loading');
             if (loadingText) loadingText.style.display = 'none';
             
-            // প্রথম ভিডিও প্রস্তুত হলেই লোডার চলে যাবে
             const reelParent = videoElement.closest('.reel');
-            if (reelParent && reelParent.getAttribute('data-index') === '0') {
+            if (reelParent && parseInt(reelParent.getAttribute('data-index')) === activeIndex) {
                 hideLoader();
             }
         }
@@ -742,42 +740,26 @@
             const loader = document.getElementById('app-loader');
             if (loader) {
                 loader.style.opacity = '0';
-                setTimeout(() => {
-                    loader.style.visibility = 'hidden';
-                }, 400);
+                setTimeout(() => { loader.style.visibility = 'hidden'; }, 300);
             }
         }
 
-        // প্লে/পজ ইন্ডিকেটর সহ কন্ট্রোল
         function togglePlay(video) {
-            const parent = video.parentElement;
-            const playIndicator = parent.querySelector('.play-indicator');
-            
+            const playIndicator = video.parentElement.querySelector('.play-indicator');
             if (video.paused) {
                 video.play().then(() => {
-                    if (playIndicator) {
-                        playIndicator.classList.remove('show');
-                    }
-                }).catch(e => console.log("Play failed", e));
+                    if (playIndicator) playIndicator.classList.remove('show');
+                }).catch(() => {});
             } else {
                 video.pause();
                 if (playIndicator) {
                     playIndicator.classList.add('show');
-                    // পজ ইন্ডিকেটরটি ২ সেকেন্ড পর নিজে থেকেই অদৃশ্য করার ব্যাকআপ
-                    setTimeout(() => {
-                        if (video.paused && playIndicator.classList.contains('show')) {
-                            // keeps showing while paused
-                        } else {
-                            playIndicator.classList.remove('show');
-                        }
-                    }, 2000);
                 }
             }
         }
 
         async function toggleLike(videoId, event) {
             if (event) event.stopPropagation();
-            
             const likeBtn = document.querySelector(`#reel-${videoId} .action-button`);
             const likeCountSpan = document.getElementById(`like-count-${videoId}`);
             const isLiked = likeBtn.classList.contains('liked');
@@ -798,21 +780,13 @@
                 await fetch('/api/video/like', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        videoId, 
-                        isLiked: newLikedState, 
-                        userId: currentUser.id,
-                        username: currentUser.username 
-                    })
+                    body: JSON.stringify({ videoId, isLiked: newLikedState, userId: currentUser.id, username: currentUser.username })
                 });
-            } catch (err) {
-                console.error(err);
-            }
+            } catch (err) { console.error(err); }
         }
 
         async function toggleSave(videoId, event) {
             if (event) event.stopPropagation();
-            
             const saveBtn = document.querySelector(`#reel-${videoId} .action-button:has(svg path[d*="M17 3H7"])`) || event.currentTarget;
             const isSaved = saveBtn.classList.contains('saved');
             const newSavedState = !isSaved;
@@ -829,20 +803,67 @@
                 await fetch('/api/video/save', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        videoId, 
-                        userId: currentUser.id, 
-                        isSaved: newSavedState 
-                    })
+                    body: JSON.stringify({ videoId, userId: currentUser.id, isSaved: newSavedState })
                 });
-            } catch (err) {
-                console.error(err);
+            } catch (err) { console.error(err); }
+        }
+
+        // Deep Link Forward sharing via Telegram
+        function shareVideo(videoId, event) {
+            if (event) event.stopPropagation();
+            
+            const botUsername = "SnapSavingBot"; 
+            const shareUrl = `https://t.me/${botUsername}/app?startapp=${videoId}`;
+            
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showToast("Link copied! Opening Telegram...");
+                setTimeout(() => {
+                    const tgText = encodeURIComponent("Check out this awesome Reel on SnapSaving! 🎥");
+                    const tgShareLink = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${tgText}`;
+                    if (tg) {
+                        tg.openTelegramLink(tgShareLink);
+                    } else {
+                        window.open(tgShareLink, '_blank');
+                    }
+                }, 800);
+            }).catch(() => {
+                const tgText = encodeURIComponent("Check out this awesome Reel on SnapSaving! 🎥");
+                const tgShareLink = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${tgText}`;
+                if (tg) {
+                    tg.openTelegramLink(tgShareLink);
+                } else {
+                    window.open(tgShareLink, '_blank');
+                }
+            });
+        }
+
+        // Handle profile interactions with badge alerts or links
+        function handleUploaderClick(uploaderId, uploaderName, uploaderPic) {
+            const isOfficial = uploaderName.toLowerCase().includes("reelsuploder") || 
+                               uploaderName.toLowerCase().includes("reelsuploader") || 
+                               uploaderId === "reelsuploder" || 
+                               uploaderId === "-1002241516027";
+
+            if (isOfficial) {
+                showToast(`Official Reels Uploader Channel <span style="color:#1da1f2; font-weight:bold; margin-left:4px;">✔️</span>`);
+                return;
+            }
+
+            if (uploaderName.startsWith('@')) {
+                const cleanUsername = uploaderName.replace('@', '');
+                const profileLink = `https://t.me/${cleanUsername}`;
+                if (tg) {
+                    tg.openTelegramLink(profileLink);
+                } else {
+                    window.open(profileLink, '_blank');
+                }
+            } else {
+                openProfileModal(uploaderId, uploaderName, uploaderPic);
             }
         }
 
         async function reportVideo(videoId, event) {
             if (event) event.stopPropagation();
-            const str = uiStrings[appLang];
             const confirmMsg = appLang === "bn" ? "রিপোর্ট করতে চান?" : "Do you want to report this?";
             if (!confirm(confirmMsg)) return;
 
@@ -852,10 +873,8 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ videoId, userId: currentUser.id, username: currentUser.username })
                 });
-                alert(appLang === "bn" ? "সফল হয়েছে" : "Success");
-            } catch (err) {
-                console.error(err);
-            }
+                showToast(appLang === "bn" ? "রিপোর্ট সফল হয়েছে" : "Reported successfully");
+            } catch (err) { console.error(err); }
         }
 
         function markAsWatched(videoId) {
@@ -878,14 +897,11 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ videoId, userId: currentUser.id })
                 });
-            } catch (err) {
-                console.error(err);
-            }
+            } catch (err) { console.error(err); }
         }
 
         function refreshFeed(event) {
             if (event) event.stopPropagation();
-            // রিলোড করার আগে লোদ স্ক্রিন ফিরিয়ে আনা
             const loader = document.getElementById('app-loader');
             if (loader) {
                 loader.style.visibility = 'visible';
@@ -895,19 +911,22 @@
         }
 
         function setupIntersectionObserver() {
-            const observerOptions = { root: container, threshold: 0.65 };
+            const observerOptions = { root: container, threshold: 0.6 };
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     const video = entry.target.querySelector('video');
                     const videoId = entry.target.id.replace('reel-', '');
+                    const index = parseInt(entry.target.getAttribute('data-index'));
                     const playIndicator = entry.target.querySelector('.play-indicator');
+
                     if (video) {
                         if (entry.isIntersecting) {
+                            activeIndex = index;
+                            updateVideoSources(activeIndex);
                             if (playIndicator) playIndicator.classList.remove('show');
                             video.play().then(() => trackView(videoId)).catch(() => {});
                         } else {
                             video.pause();
-                            video.currentTime = 0;
                             if (playIndicator) playIndicator.classList.remove('show');
                         }
                     }
@@ -920,7 +939,6 @@
             document.querySelectorAll('.reel').forEach(reel => {
                 let lastTap = 0;
                 reel.addEventListener('click', function(e) {
-                    // ক্যাপশন লিংক ক্লিক করলে ডাবল ট্যাপ ব্লক করা
                     if (e.target.classList.contains('caption-link')) return;
 
                     const currentTime = new Date().getTime();
@@ -929,7 +947,7 @@
                         const videoId = reel.id.replace('reel-', '');
                         const heartPop = document.getElementById(`heart-pop-${videoId}`);
                         heartPop.classList.add('pop-active');
-                        setTimeout(() => heartPop.classList.remove('pop-active'), 750);
+                        setTimeout(() => heartPop.classList.remove('pop-active'), 700);
                         const likeBtn = reel.querySelector('.action-button');
                         if (!likeBtn.classList.contains('liked')) toggleLike(videoId);
                     }
@@ -944,29 +962,24 @@
             document.getElementById('modalProfileName').innerText = uploaderName;
             document.getElementById('modalProfilePic').src = uploaderPic;
 
-            // টগলগুলোর ডিফল্ট রূপ নির্ধারণ
-            let uploadingChecked = true;
-            let notificationChecked = true;
+            let uploadingVal = true;
+            let notificationVal = true;
 
             try {
                 const res = await fetch(`/api/user/settings?userId=${uploaderId}`);
                 if (res.ok) {
                     const settings = await res.json();
-                    uploadingChecked = settings.uploadingReels !== false;
-                    notificationChecked = settings.notifications !== false;
-                } else {
-                    throw new Error();
+                    uploadingVal = settings.uploadingReels !== false;
+                    notificationVal = settings.notifications !== false;
                 }
             } catch (err) {
-                // অফলাইন বা লোকাল স্টোরেজ ব্যাকআপ
-                uploadingChecked = localStorage.getItem(`setting_upload_${uploaderId}`) !== 'false';
-                notificationChecked = localStorage.getItem(`setting_notify_${uploaderId}`) !== 'false';
+                uploadingVal = localStorage.getItem(`setting_upload_${uploaderId}`) !== 'false';
+                notificationVal = localStorage.getItem(`setting_notify_${uploaderId}`) !== 'false';
             }
 
-            document.getElementById('uploadToggle').checked = uploadingChecked;
-            document.getElementById('notificationToggle').checked = notificationChecked;
+            document.getElementById('uploadToggle').checked = uploadingVal;
+            document.getElementById('notificationToggle').checked = notificationVal;
 
-            // শুধুমাত্র নিজের প্রোফাইল হলে সেটিংস অন/অফ করতে দেয়া হবে
             if (uploaderId !== currentUser.id) {
                 document.getElementById('uploadToggle').disabled = true;
                 document.getElementById('notificationToggle').disabled = true;
@@ -974,7 +987,6 @@
                 document.getElementById('uploadToggle').disabled = false;
                 document.getElementById('notificationToggle').disabled = false;
             }
-            
             document.getElementById('profileModal').classList.add('open');
         }
 
@@ -982,13 +994,11 @@
             document.getElementById('profileModal').classList.remove('open');
         }
 
-        // সেটিংস সফলভাবে লোকালস্টোরেজ এবং সার্ভারে আপডেট করার মেথড
         async function updateProfileSetting() {
             if (activeProfileUserId !== currentUser.id) return;
             const uploadingVal = document.getElementById('uploadToggle').checked;
             const notificationVal = document.getElementById('notificationToggle').checked;
 
-            // সাথে সাথে লোকালস্টোরেজে আপডেট যাতে ল্যাগ ছাড়া টগল কাজ করে
             localStorage.setItem(`setting_upload_${currentUser.id}`, uploadingVal);
             localStorage.setItem(`setting_notify_${currentUser.id}`, notificationVal);
 
@@ -1002,8 +1012,9 @@
                         notifications: notificationVal
                     })
                 });
+                showToast("Preferences Updated Successfully");
             } catch (err) {
-                console.error("Failed to sync settings with server", err);
+                console.error("Failed to sync settings", err);
             }
         }
 
