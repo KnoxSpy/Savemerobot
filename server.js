@@ -23,6 +23,9 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const TARGET_CHANNEL = 'reelsuploder'; 
 const ADMIN_ID = '7304915019'; 
 
+// --- WebApp Domain Configuration (Change this to your actual deployed domain) ---
+const DOMAIN_NAME = process.env.DOMAIN_NAME || 'snapsaving-reels.vercel.app';
+
 // --- Multilingual Localization Strings (English Default) ---
 const strings = {
     en: {
@@ -59,7 +62,7 @@ const strings = {
         add_gr: "➕ গ্রুপে বট যুক্ত করুন",
         lang_btn: "🇬🇧 Change to English",
         lang_switched: "ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
-        settings_title: "⚙️ <b>আপনার সেটিংস ও পছন্দসমূহ</b>\n\nনিচের বাটনগুলো দিয়ে আপনার মিনি অ্যাপের সেটিংস পরিবর্তন করুন:",
+        settings_title: "⚙️ <b>আপনার সেটিিংস ও পছন্দসমূহ</b>\n\nনিচের বাটনগুলো দিয়ে আপনার মিনি অ্যাপের সেটিংস পরিবর্তন করুন:",
         notify_on: "নোটিফিকেশন: চালু 🔔",
         notify_off: "নোটিফিকেশন: বন্ধ 🔕",
         upload_on: "রিল আপলোড: চালু 📤",
@@ -514,7 +517,7 @@ app.post('/api/user/settings', async (req, res) => {
 // --- Bot Language Helper ---
 async function getUserLang(chatId) {
     const snap = await db.ref(`users/${chatId}/lang`).once('value');
-    return snap.val() || 'en'; // default English!
+    return snap.val() || 'en'; 
 }
 
 async function trackUser(chatId) {
@@ -591,19 +594,32 @@ bot.on('channel_post', async (msg) => {
                     });
                 } catch (reactErr) {}
 
+                // --- Admin Notification when Video Is Uploaded/Synced ---
                 try {
-                    const postLink = `https://t.me/${targetChannel}/${messageId}`;
-                    const adminMsg = `📹 <b>New Video Synced!</b>\n\n🔗 <b>Post Link:</b> <a href="${postLink}">Watch</a>\n💬 <b>Caption:</b> ${caption || "None"}`;
+                    const videoSizeMB = fileSize ? `${(fileSize / (1024 * 1024)).toFixed(2)} MB` : "Unknown";
+                    const uploadDate = new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' });
+                    const botInfo = await bot.getMe();
+                    const botUsername = botInfo.username;
+                    
+                    const appLink = `https://t.me/${botUsername}/app?startapp=${messageId}`;
+                    
+                    const adminMsg = `📹 <b>নতুন ভিডিও আপলোড হয়েছে!</b>\n\n` +
+                                     `🔗 <b>Video link :</b> ${appLink}\n` +
+                                     `📦 <b>Video size :</b> ${videoSizeMB}\n` +
+                                     `📅 <b>Upload date :</b> ${uploadDate}\n\n` +
+                                     `💬 <b>ক্যাপশন:</b> ${caption.replace(/_uid_\d+_/g, '').trim() || "নেই"}`;
                     
                     await bot.sendMessage(ADMIN_ID, adminMsg, {
                         parse_mode: 'HTML',
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: "❌ Remove Video from Server", callback_data: `remove_vid_${messageId}` }]
+                                [{ text: "❌ Remove this video", callback_data: `remove_vid_${messageId}` }]
                             ]
                         }
                     });
-                } catch (adminErr) {}
+                } catch (adminErr) {
+                    console.error("Admin upload alert failed:", adminErr.message);
+                }
 
             } catch (err) {
                 console.error("Video sync error:", err.message);
@@ -639,17 +655,30 @@ bot.on('message', async (msg) => {
             
             const botInfo = await bot.getMe();
             const botUsername = botInfo.username;
-            const webAppUrl = `https://${req?.headers?.host || 'yourdomain.com'}/reels`;
+            
+            // Fixed the reference error using configured domain variables
+            const webAppUrl = `https://${DOMAIN_NAME}/reels`;
 
-            return bot.sendPhoto(chatId, welcomeImg, {
-                caption: welcomeMsg,
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: str.watch_btn, web_app: { url: webAppUrl } }]
-                    ]
-                }
-            });
-        } catch (e) { console.error(e); }
+            try {
+                return await bot.sendPhoto(chatId, welcomeImg, {
+                    caption: welcomeMsg,
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: str.watch_btn, web_app: { url: webAppUrl } }]
+                        ]
+                    }
+                });
+            } catch (imgErr) {
+                // Text fallback if image sending encounters any network/file error
+                return await bot.sendMessage(chatId, welcomeMsg, {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: str.watch_btn, web_app: { url: webAppUrl } }]
+                        ]
+                    }
+                });
+            }
+        } catch (e) { console.error("Start command processing error:", e); }
     }
 
     if (text === '/settings') {
@@ -695,7 +724,6 @@ bot.on('callback_query', async (q) => {
     const lang = await getUserLang(chatId);
     const str = strings[lang];
 
-    // Language switch handlers
     if (callbackData === "setlang_bn" || callbackData === "setlang_en") {
         const newLang = callbackData === "setlang_bn" ? 'bn' : 'en';
         await db.ref(`users/${chatId}/lang`).set(newLang);
@@ -712,7 +740,6 @@ bot.on('callback_query', async (q) => {
         return;
     }
 
-    // Toggle Notifications Setting in Bot Chat
     if (callbackData === "toggle_notify") {
         const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
         const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
@@ -730,7 +757,6 @@ bot.on('callback_query', async (q) => {
         return;
     }
 
-    // Toggle Reels Upload Syncing in Bot Chat
     if (callbackData === "toggle_upload") {
         const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
         const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
@@ -757,13 +783,13 @@ bot.on('callback_query', async (q) => {
         try {
             await db.ref(`mini_app_videos/${messageId}`).remove();
             
-            await bot.editMessageText(`✅ <b>Reel removed from database.</b>`, {
+            await bot.editMessageText(`✅ <b>ভিডিওটি অ্যাপ এবং সার্ভার থেকে রিমুভ করা হয়েছে!</b>`, {
                 chat_id: q.message.chat.id,
                 message_id: q.message.message_id,
                 parse_mode: 'HTML'
             });
             
-            await bot.answerCallbackQuery(q.id, { text: "Removed successfully!" });
+            await bot.answerCallbackQuery(q.id, { text: "Removed successfully from app!" });
         } catch (err) {
             await bot.answerCallbackQuery(q.id, { text: "Error deleting video.", show_alert: true });
         }
@@ -869,7 +895,6 @@ async function processDownload(chatId, url, msgId) {
 
             await bot.sendVideo(chatId, video.url, videoOpts);
 
-            // Forward video syncing to TARGET_CHANNEL if user settings has Reels Upload active
             try {
                 const userSettingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
                 const settings = userSettingsSnap.val() || {};
