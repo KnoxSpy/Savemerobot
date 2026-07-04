@@ -467,7 +467,7 @@
         };
 
         let videos = [];
-        let appLang = "en"; // Default default format English
+        let appLang = "en"; 
         let activeIndex = 0;
         const container = document.getElementById('reelsContainer');
 
@@ -496,7 +496,6 @@
             }
         };
 
-        // Custom Toast mechanism
         function showToast(message) {
             const toast = document.getElementById('custom-toast');
             const toastText = document.getElementById('toast-text');
@@ -509,7 +508,6 @@
             }, 2500);
         }
 
-        // Translation Loader
         async function fetchLanguageAndVideos() {
             try {
                 const res = await fetch(`/api/user/lang?userId=${currentUser.id}`);
@@ -526,19 +524,16 @@
             if (!text) return "";
             let safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             
-            // Link parsing
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             safeText = safeText.replace(urlRegex, function(url) {
                 return `<a href="${url}" target="_blank" class="caption-link" onclick="event.stopPropagation();">${url}</a>`;
             });
 
-            // Mention parsing
             const mentionRegex = /@([a-zA-Z0-9_]{5,32})/g;
             safeText = safeText.replace(mentionRegex, function(mention, username) {
                 return `<a href="https://t.me/${username}" target="_blank" class="caption-link" onclick="event.stopPropagation();">${mention}</a>`;
             });
 
-            // Bold styling
             safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             safeText = safeText.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
 
@@ -561,14 +556,12 @@
                 
                 videos = data.videos || [];
 
-                // Sort newest uploads first
                 videos.sort((a, b) => {
                     const dateA = a.timestamp ? new Date(a.timestamp) : parseInt(a.id) || 0;
                     const dateB = b.timestamp ? new Date(b.timestamp) : parseInt(b.id) || 0;
                     return dateB - dateA;
                 });
 
-                // Deep Linking: If startapp query exists, search & move target video to index 0
                 const startParam = tg?.initDataUnsafe?.start_param;
                 if (startParam) {
                     const matchedIndex = videos.findIndex(v => String(v.id) === String(startParam));
@@ -607,14 +600,12 @@
                     <div class="reel" id="reel-${video.id}" data-index="${index}">
                         <div class="loading">${str.loading}</div>
                         
-                        <!-- Middle Playback Feedback Indicator -->
                         <div class="play-indicator">
                             <svg viewBox="0 0 24 24" width="36" height="36" fill="#fff">
                                 <path d="M8 5v14l11-7z"/>
                             </svg>
                         </div>
 
-                        <!-- Lazy loading via data-src to optimize webview performance -->
                         <video data-src="${streamUrl}" loop playsinline webkit-playsinline preload="none" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
                         
                         <div class="heart-pop" id="heart-pop-${video.id}">
@@ -624,7 +615,6 @@
                         </div>
 
                         <div class="overlay">
-                            <!-- Bottom Detail displays Client User (Viewer) profile details -->
                             <div class="video-details">
                                 <div class="uploader-info" onclick="openProfileModal('${currentUser.id}', '${currentUser.username}', '${currentUser.photo}')">
                                     <img src="${currentUser.photo}" alt="${currentUser.username}">
@@ -634,12 +624,10 @@
                             </div>
 
                             <div class="actions-panel">
-                                <!-- Profile Pic above Love Reaction shows Video Uploader details -->
                                 <div class="uploader-panel-pic" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}')">
                                     <img src="${uploaderPic}" alt="${uploaderName}">
                                 </div>
 
-                                <!-- Love Icon -->
                                 <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
@@ -649,17 +637,6 @@
                                     <span id="like-count-${video.id}">${video.likes || 0}</span>
                                 </button>
 
-                                <!-- Views Counter -->
-                                <div class="action-button" style="pointer-events: none;">
-                                    <div class="action-icon">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                                        </svg>
-                                    </div>
-                                    <span id="view-count-${video.id}">${video.views || 0}</span>
-                                </div>
-
-                                <!-- Save Button -->
                                 <button class="action-button ${isSaved ? 'saved' : ''}" onclick="toggleSave('${video.id}', event)">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
@@ -669,7 +646,6 @@
                                     <span>${str.save}</span>
                                 </button>
 
-                                <!-- Share Button (Direct Deep-link Generation) -->
                                 <button class="action-button" onclick="shareVideo('${video.id}', event)">
                                     <div class="action-icon" style="background: rgba(49, 130, 206, 0.2);">
                                         <svg viewBox="0 0 24 24" style="color: #3182ce;">
@@ -679,7 +655,6 @@
                                     <span style="color: #3182ce;">${str.share}</span>
                                 </button>
 
-                                <!-- Refresh Feed -->
                                 <button class="action-button" onclick="refreshFeed(event)">
                                     <div class="action-icon">
                                         <svg viewBox="0 0 24 24">
@@ -687,6 +662,15 @@
                                         </svg>
                                     </div>
                                     <span>${str.refresh}</span>
+                                </button>
+
+                                <button class="action-button" onclick="reportVideo('${video.id}', event)">
+                                    <div class="action-icon" style="background: rgba(229, 62, 62, 0.15);">
+                                        <svg viewBox="0 0 24 24" style="color: #e53e3e;">
+                                            <path d="M15.73 3H8.27L3 8.27v7.46L8.27 21h7.46L21 15.73V8.27L15.73 3zM12 17.3c-.72 0-1.3-.58-1.3-1.3 0-.72.58-1.3 1.3-1.3.72 0 1.3.58 1.3 1.3 0 .72-.58 1.3-1.3 1.3zm1-4.3h-2V7h2v6z"/>
+                                        </svg>
+                                    </div>
+                                    <span style="color: #e53e3e;">${str.report}</span>
                                 </button>
                             </div>
                         </div>
@@ -699,7 +683,6 @@
             setupDoubleTap();
         }
 
-        // Virtualized Source Swapping to optimize mobile WebView performance and prevent memory overflow
         function updateVideoSources(currentIndex) {
             const reels = document.querySelectorAll('.reel');
             reels.forEach((reel, i) => {
@@ -715,7 +698,7 @@
                 } else {
                     if (video.src && video.src !== "") {
                         video.pause();
-                        video.removeAttribute('src'); // Complete memory unload
+                        video.removeAttribute('src'); 
                         video.load();
                         video.classList.remove('loaded');
                         const loadingText = reel.querySelector('.loading');
@@ -808,7 +791,6 @@
             } catch (err) { console.error(err); }
         }
 
-        // Deep Link Forward sharing via Telegram
         function shareVideo(videoId, event) {
             if (event) event.stopPropagation();
             
@@ -837,7 +819,6 @@
             });
         }
 
-        // Handle profile interactions with badge alerts or links
         function handleUploaderClick(uploaderId, uploaderName, uploaderPic) {
             const isOfficial = uploaderName.toLowerCase().includes("reelsuploder") || 
                                uploaderName.toLowerCase().includes("reelsuploader") || 
@@ -887,11 +868,6 @@
 
         async function trackView(videoId) {
             try {
-                const viewCountSpan = document.getElementById(`view-count-${videoId}`);
-                if (viewCountSpan) {
-                    let currentViews = parseInt(viewCountSpan.innerText);
-                    viewCountSpan.innerText = currentViews + 1;
-                }
                 await fetch('/api/video/view', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
