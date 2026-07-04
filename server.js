@@ -23,24 +23,10 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const TARGET_CHANNEL = 'reelsuploder'; 
 const ADMIN_ID = '7304915019'; 
 
-// --- Multilingual Localization Strings ---
+// --- Multilingual Localization Strings (English Default) ---
 const strings = {
-    bn: {
-        welcome: "স্বাগতম! ভিডিও ডাউনলোড করতে লিংক পাঠান।",
-        must_join: "⚠️ আমাদের চ্যানেলে জয়েন করতে হবে এই বটটি ব্যবহার করতে!",
-        verify: "✅ ভেরিফাই করুন",
-        not_joined: "❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!",
-        sending_audio: "অডিও পাঠানো হচ্ছে...",
-        video_not_found: "❌ ভিডিও পাওয়া যায়নি।",
-        error_fetch: "❌ দুঃখিত, ভিডিওটি ডাউনলোড করা সম্ভব হয়নি।",
-        join_ch: "📢 চ্যানেলে জয়েন করুন",
-        join_gr: "👥 গ্রুপে জয়েন করুন",
-        add_gr: "➕ গ্রুপে বট যুক্ত করুন",
-        lang_btn: "🇬🇧 English এ পরিবর্তন করুন",
-        lang_switched: "ভাষা পরিবর্তন করে বাংলা করা হয়েছে।"
-    },
     en: {
-        welcome: "Welcome! Send me a link to download videos.",
+        welcome: "Welcome to SnapSaving! Send me any social media video link to download.",
         must_join: "⚠️ You must join our channels to use this bot!",
         verify: "✅ Verify Join",
         not_joined: "❌ You haven't joined all channels yet!",
@@ -51,7 +37,35 @@ const strings = {
         join_gr: "👥 Join Group",
         add_gr: "➕ Add Bot to Group",
         lang_btn: "🇧🇩 Change to বাংলা",
-        lang_switched: "Language has been changed to English."
+        lang_switched: "Language changed to English.",
+        settings_title: "⚙️ <b>Your Preferences & Settings</b>\n\nConfigure your Mini-App settings directly from here:",
+        notify_on: "Notifications: ON 🔔",
+        notify_off: "Notifications: OFF 🔕",
+        upload_on: "Reels Upload: ON 📤",
+        upload_off: "Reels Upload: OFF 📥",
+        change_lang: "Language: English 🌐",
+        watch_btn: "Watch Videos 🍿"
+    },
+    bn: {
+        welcome: "SnapSaving-এ স্বাগতম! ভিডিও ডাউনলোড করতে যেকোনো লিংক পাঠান।",
+        must_join: "⚠️ আমাদের চ্যানেলে জয়েন করতে হবে এই বটটি ব্যবহার করতে!",
+        verify: "✅ ভেরিফাই করুন",
+        not_joined: "❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!",
+        sending_audio: "অডিও পাঠানো হচ্ছে...",
+        video_not_found: "❌ ভিডিও পাওয়া যায়নি।",
+        error_fetch: "❌ দুঃখিত, ভিডিওটি ডাউনলোড করা সম্ভব হয়নি।",
+        join_ch: "📢 চ্যানেলে জয়েন করুন",
+        join_gr: "👥 গ্রুপে জয়েন করুন",
+        add_gr: "➕ গ্রুপে বট যুক্ত করুন",
+        lang_btn: "🇬🇧 Change to English",
+        lang_switched: "ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
+        settings_title: "⚙️ <b>আপনার সেটিংস ও পছন্দসমূহ</b>\n\nনিচের বাটনগুলো দিয়ে আপনার মিনি অ্যাপের সেটিংস পরিবর্তন করুন:",
+        notify_on: "নোটিফিকেশন: চালু 🔔",
+        notify_off: "নোটিফিকেশন: বন্ধ 🔕",
+        upload_on: "রিল আপলোড: চালু 📤",
+        upload_off: "রিল আপলোড: বন্ধ 📥",
+        change_lang: "ভাষা: বাংলা 🌐",
+        watch_btn: "Watch Videos 🍿"
     }
 };
 
@@ -74,18 +88,16 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const userSessions = {}; 
 const audioCache = {}; 
 
-// ভাষা পরিবর্তনের ডাইনামিক কিবোর্ড বাটন কনফিগারেশন
 const chatBoxConfig = {
     reply_markup: {
         keyboard: [[{ text: "🇧🇩 বাংলা / 🇬🇧 English" }]],
         resize_keyboard: true,
-        input_field_placeholder: "Send me links"
+        input_field_placeholder: "Send links to download"
     }
 };
 
 // --- Helper Functions ---
 
-// ডায়নামিক প্রোফাইল পিকচার এবং নাম রিট্রিভ করার হেল্পার ফাংশন
 async function getUserProfileInfo(userId) {
     try {
         const chat = await bot.getChat(userId);
@@ -102,7 +114,6 @@ async function getUserProfileInfo(userId) {
     }
 }
 
-// ইন-অ্যাপ নোটিফিকেশন পাঠানোর মেকানিজম
 async function sendNotification(uploaderId, message) {
     if (!uploaderId || uploaderId.startsWith('-100')) return;
     try {
@@ -116,6 +127,27 @@ async function sendNotification(uploaderId, message) {
     } catch (err) {
         console.error("Failed to send notification:", err.message);
     }
+}
+
+async function getSettingsKeyboard(chatId) {
+    const lang = await getUserLang(chatId);
+    const str = strings[lang];
+
+    const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
+    const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
+
+    const notifyBtnText = settings.notifications !== false ? str.notify_on : str.notify_off;
+    const uploadBtnText = settings.uploadingReels !== false ? str.upload_on : str.upload_off;
+
+    return {
+        inline_keyboard: [
+            [{ text: str.change_lang, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }],
+            [
+                { text: notifyBtnText, callback_data: 'toggle_notify' },
+                { text: uploadBtnText, callback_data: 'toggle_upload' }
+            ]
+        ]
+    };
 }
 
 // --- Page Routes ---
@@ -179,7 +211,6 @@ app.post('/api/admin/del-channel', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- Ad Management API Routes ---
 app.post('/api/admin/save-ad', async (req, res) => {
     try {
         const { index, text, link } = req.body;
@@ -211,7 +242,6 @@ app.post('/api/admin/del-ad', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- Broadcast API Route ---
 app.post('/api/admin/broadcast', async (req, res) => {
     const { type, photoUrl, message, buttonsText } = req.body;
     
@@ -261,9 +291,8 @@ app.post('/api/admin/broadcast', async (req, res) => {
     }
 });
 
-// --- Mini App API Routes (Updated with dynamic filters and Language Sync) ---
+// --- Mini App API Routes ---
 
-// ইউজারের ভাষা পরিবর্তনের তথ্য অ্যাপে পাঠানোর এন্ডপয়েন্ট
 app.get('/api/user/lang', async (req, res) => {
     const { userId } = req.query;
     if (!userId) return res.status(400).json({ error: "Missing userId" });
@@ -288,7 +317,6 @@ app.post('/api/videos', async (req, res) => {
 
         let wasReset = false;
         const seenSet = new Set(seenVideos || []);
-
         let filteredList = videoList.filter(video => !seenSet.has(video.id));
 
         if (filteredList.length === 0 && videoList.length > 0) {
@@ -296,8 +324,6 @@ app.post('/api/videos', async (req, res) => {
             wasReset = true;
         }
 
-        filteredList.sort(() => Math.random() - 0.5);
-        
         res.json({
             videos: filteredList,
             wasReset
@@ -317,7 +343,6 @@ app.get('/api/videos', async (req, res) => {
             ...data[key]
         }));
         
-        videoList.sort(() => Math.random() - 0.5);
         res.json(videoList);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -369,8 +394,8 @@ app.post('/api/video/like', async (req, res) => {
         });
 
         if (isLiked && video.uploaderId && video.uploaderId !== userId) {
-            const likerName = username ? `@${username}` : "কেউ একজন";
-            await sendNotification(video.uploaderId, `❤️ <b>${likerName}</b> আপনার রিল ভিডিওটি লাইক করেছেন!`);
+            const likerName = username ? `@${username}` : "Someone";
+            await sendNotification(video.uploaderId, `❤️ <b>${likerName}</b> liked your reel!`);
         }
 
         res.json({ success: true });
@@ -393,7 +418,7 @@ app.post('/api/video/view', async (req, res) => {
         await videoRef.child('views').transaction((currentViews) => (currentViews || 0) + 1);
 
         if (video.uploaderId && video.uploaderId !== userId) {
-            await sendNotification(video.uploaderId, `👁️ কেউ একজন আপনার রিল ভিডিওটি দেখেছেন!`);
+            await sendNotification(video.uploaderId, `👁️ Someone watched your reel!`);
         }
 
         res.json({ success: true });
@@ -414,12 +439,12 @@ app.post('/api/video/save', async (req, res) => {
 
         if (isSaved) {
             await bot.sendVideo(userId, video.fileId, {
-                caption: `💾 <b>সংরক্ষিত ভিডিও!</b>\n\nক্যাপশন: ${video.caption || "নেই"}\n\nসরাসরি মিনি অ্যাপ থেকে সংরক্ষিত।`,
+                caption: `💾 <b>Saved Reel!</b>\n\nCaption: ${video.caption || "None"}\n\nSaved directly from mini app.`,
                 parse_mode: 'HTML'
             });
 
             if (video.uploaderId && video.uploaderId !== userId) {
-                await sendNotification(video.uploaderId, `💾 কেউ একজন আপনার রিল ভিডিওটি চ্যাটে সেভ করেছেন!`);
+                await sendNotification(video.uploaderId, `💾 Someone saved your reel directly in chat!`);
             }
         }
         res.json({ success: true });
@@ -439,7 +464,7 @@ app.post('/api/video/report', async (req, res) => {
         if (!video) return res.status(404).json({ error: "Video not found" });
 
         const reporterName = username ? `@${username}` : "Unknown User";
-        const adminMsg = `⚠️ <b>ভিডিও রিপোর্ট নোটিফিকেশন!</b>\n\n👤 <b>রিপোর্টকারী:</b> ${reporterName} (ID: ${userId})\n🆔 <b>রিল আইডি:</b> ${videoId}\n💬 <b>ক্যাপশন:</b> ${video.caption || "নেই"}`;
+        const adminMsg = `⚠️ <b>Video Report Alert!</b>\n\n👤 <b>Reporter:</b> ${reporterName} (ID: ${userId})\n🆔 <b>Reel ID:</b> ${videoId}\n💬 <b>Caption:</b> ${video.caption || "None"}`;
 
         await bot.sendMessage(ADMIN_ID, adminMsg, {
             parse_mode: 'HTML',
@@ -489,10 +514,9 @@ app.post('/api/user/settings', async (req, res) => {
 // --- Bot Language Helper ---
 async function getUserLang(chatId) {
     const snap = await db.ref(`users/${chatId}/lang`).once('value');
-    return snap.val() || 'bn'; 
+    return snap.val() || 'en'; // default English!
 }
 
-// --- Bot Logic ---
 async function trackUser(chatId) {
     const today = new Date().toISOString().split('T')[0];
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -519,7 +543,6 @@ async function getMissingChannels(userId) {
     } catch (e) { return []; }
 }
 
-// @reelsuploder চ্যানেল থেকে ভিডিও অটো সিঙ্ক ও ইউজার মেটাডাটা এক্সট্রাকশন লজিক
 bot.on('channel_post', async (msg) => {
     const targetChannel = TARGET_CHANNEL;
 
@@ -536,7 +559,6 @@ bot.on('channel_post', async (msg) => {
                 let uploaderName = `@${msg.chat.username}` || msg.chat.title || "Reels Uploader";
                 let uploaderPic = "https://via.placeholder.com/150";
 
-                // ক্যাপশন থেকে হিডেন মেটাডাটা এক্সট্রাক্ট করে ইউজার প্রোফাইল পিকচার টেলিগ্রাম থেকে অটো নিয়ে নেওয়া হচ্ছে
                 const uidMatch = caption.match(/_uid_(\d+)_/);
                 if (uidMatch) {
                     const extractedUserId = uidMatch[1];
@@ -545,7 +567,6 @@ bot.on('channel_post', async (msg) => {
                     uploaderName = profile.name;
                     uploaderPic = profile.photoUrl;
                 } else {
-                    // ফরওয়ার্ড বা ডিরেক্ট চ্যানেলে ফাইল আপলোডের ক্ষেত্রে Reelsuploader লোগো টেলিগ্রাম থেকে অটো নিয়ে নিবে
                     const channelProfile = await getUserProfileInfo(msg.chat.id);
                     uploaderPic = channelProfile.photoUrl;
                 }
@@ -561,7 +582,6 @@ bot.on('channel_post', async (msg) => {
                     uploaderPic: uploaderPic,
                     timestamp: admin.database.ServerValue.TIMESTAMP
                 });
-                console.log(`Video synced from @${targetChannel}: ${messageId}`);
 
                 try {
                     await bot._request('setMessageReaction', {
@@ -569,13 +589,11 @@ bot.on('channel_post', async (msg) => {
                         message_id: msg.message_id,
                         reaction: JSON.stringify([{ type: 'emoji', emoji: '👍' }])
                     });
-                } catch (reactErr) {
-                    console.error("Could not set reaction:", reactErr.message);
-                }
+                } catch (reactErr) {}
 
                 try {
                     const postLink = `https://t.me/${targetChannel}/${messageId}`;
-                    const adminMsg = `📹 <b>নতুন ভিডিও সিঙ্ক হয়েছে!</b>\n\n🔗 <b>চ্যানেল পোস্ট লিঙ্ক:</b> <a href="${postLink}">ভিডিওটি দেখুন</a>\n💬 <b>ক্যাপশন:</b> ${caption || "নেই"}`;
+                    const adminMsg = `📹 <b>New Video Synced!</b>\n\n🔗 <b>Post Link:</b> <a href="${postLink}">Watch</a>\n💬 <b>Caption:</b> ${caption || "None"}`;
                     
                     await bot.sendMessage(ADMIN_ID, adminMsg, {
                         parse_mode: 'HTML',
@@ -585,9 +603,7 @@ bot.on('channel_post', async (msg) => {
                             ]
                         }
                     });
-                } catch (adminErr) {
-                    console.error("Admin notification failed:", adminErr.message);
-                }
+                } catch (adminErr) {}
 
             } catch (err) {
                 console.error("Video sync error:", err.message);
@@ -603,7 +619,6 @@ bot.on('message', async (msg) => {
 
     await trackUser(chatId).catch(() => {});
 
-    // কিবোর্ড মেনু বাটন থেকে ভাষা টগল করা এবং অ্যাপের সাথে সিঙ্ক করা
     if (text === "🇧🇩 বাংলা / 🇬🇧 English") {
         const currentLang = await getUserLang(chatId);
         const newLang = currentLang === 'bn' ? 'en' : 'bn';
@@ -624,21 +639,27 @@ bot.on('message', async (msg) => {
             
             const botInfo = await bot.getMe();
             const botUsername = botInfo.username;
+            const webAppUrl = `https://${req?.headers?.host || 'yourdomain.com'}/reels`;
 
             return bot.sendPhoto(chatId, welcomeImg, {
                 caption: welcomeMsg,
                 reply_markup: {
                     inline_keyboard: [
-                        [
-                            { text: str.join_ch, url: "https://t.me/+GyFgfeJIub81MDg9" },
-                            { text: str.join_gr, url: "https://t.me/+V8XTiO_Vo8tlOGZl" }
-                        ],
-                        [{ text: str.add_gr, url: `https://t.me/${botUsername}?startgroup=true` }],
-                        [{ text: str.lang_btn, callback_data: lang === 'bn' ? 'setlang_en' : 'setlang_bn' }]
+                        [{ text: str.watch_btn, web_app: { url: webAppUrl } }]
                     ]
                 }
             });
         } catch (e) { console.error(e); }
+    }
+
+    if (text === '/settings') {
+        const lang = await getUserLang(chatId);
+        const str = strings[lang];
+        const keyboard = await getSettingsKeyboard(chatId);
+        return bot.sendMessage(chatId, str.settings_title, {
+            parse_mode: 'HTML',
+            reply_markup: keyboard
+        });
     }
 
     if (text.startsWith('http')) {
@@ -674,57 +695,77 @@ bot.on('callback_query', async (q) => {
     const lang = await getUserLang(chatId);
     const str = strings[lang];
 
-    // ইনলাইন বাটন থেকে ভাষা সিঙ্ক করার লজিক
+    // Language switch handlers
     if (callbackData === "setlang_bn" || callbackData === "setlang_en") {
         const newLang = callbackData === "setlang_bn" ? 'bn' : 'en';
         await db.ref(`users/${chatId}/lang`).set(newLang);
         
-        const newStr = strings[newLang];
-        const snap = await db.ref('admin_settings').once('value');
-        const data = snap.val() || {};
-        const welcomeMsg = data.welcomeText || newStr.welcome;
-        
-        const botInfo = await bot.getMe();
-        const botUsername = botInfo.username;
-
-        await bot.editMessageCaption(welcomeMsg, {
+        const keyboard = await getSettingsKeyboard(chatId);
+        await bot.editMessageText(strings[newLang].settings_title, {
             chat_id: chatId,
             message_id: q.message.message_id,
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: newStr.join_ch, url: "https://t.me/+GyFgfeJIub81MDg9" },
-                        { text: newStr.join_gr, url: "https://t.me/+V8XTiO_Vo8tlOGZl" }
-                    ],
-                    [{ text: newStr.add_gr, url: `https://t.me/${botUsername}?startgroup=true` }],
-                    [{ text: newStr.lang_btn, callback_data: newLang === 'bn' ? 'setlang_en' : 'setlang_bn' }]
-                ]
-            }
+            parse_mode: 'HTML',
+            reply_markup: keyboard
         }).catch(() => {});
 
-        await bot.answerCallbackQuery(q.id, { text: newLang === 'bn' ? "ভাষা পরিবর্তন করা হয়েছে।" : "Language has been changed.", show_alert: false });
+        await bot.answerCallbackQuery(q.id, { text: strings[newLang].lang_switched });
+        return;
+    }
+
+    // Toggle Notifications Setting in Bot Chat
+    if (callbackData === "toggle_notify") {
+        const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
+        const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
+        const newNotify = settings.notifications === false;
+
+        await db.ref(`users/${chatId}/settings`).update({ notifications: newNotify });
+        const keyboard = await getSettingsKeyboard(chatId);
+        
+        await bot.editMessageReplyMarkup(keyboard, {
+            chat_id: chatId,
+            message_id: q.message.message_id
+        }).catch(() => {});
+
+        await bot.answerCallbackQuery(q.id, { text: "Notifications updated!" });
+        return;
+    }
+
+    // Toggle Reels Upload Syncing in Bot Chat
+    if (callbackData === "toggle_upload") {
+        const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
+        const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
+        const newUpload = settings.uploadingReels === false;
+
+        await db.ref(`users/${chatId}/settings`).update({ uploadingReels: newUpload });
+        const keyboard = await getSettingsKeyboard(chatId);
+        
+        await bot.editMessageReplyMarkup(keyboard, {
+            chat_id: chatId,
+            message_id: q.message.message_id
+        }).catch(() => {});
+
+        await bot.answerCallbackQuery(q.id, { text: "Reels Upload settings updated!" });
         return;
     }
 
     if (callbackData.startsWith("remove_vid_")) {
         if (q.from.id.toString() !== ADMIN_ID) {
-            return bot.answerCallbackQuery(q.id, { text: "❌ আপনি এই ভিডিও রিমুভ করার জন্য অনুমোদিত নন!", show_alert: true });
+            return bot.answerCallbackQuery(q.id, { text: "❌ Unauthorized!", show_alert: true });
         }
         
         const messageId = callbackData.replace("remove_vid_", "");
         try {
             await db.ref(`mini_app_videos/${messageId}`).remove();
             
-            await bot.editMessageText(q.message.text ? `✅ <b>ভিডিওটি রিমুভ করা হয়েছে!</b>` : `✅ <b>ভিডিওটি রিমুভ করা হয়েছে!</b>`, {
+            await bot.editMessageText(`✅ <b>Reel removed from database.</b>`, {
                 chat_id: q.message.chat.id,
                 message_id: q.message.message_id,
                 parse_mode: 'HTML'
             });
             
-            await bot.answerCallbackQuery(q.id, { text: "Removed successfully!", show_alert: false });
+            await bot.answerCallbackQuery(q.id, { text: "Removed successfully!" });
         } catch (err) {
-            console.error("Failed to remove video:", err.message);
-            await bot.answerCallbackQuery(q.id, { text: "Error while deleting video.", show_alert: true });
+            await bot.answerCallbackQuery(q.id, { text: "Error deleting video.", show_alert: true });
         }
         return;
     }
@@ -739,6 +780,7 @@ bot.on('callback_query', async (q) => {
             bot.answerCallbackQuery(q.id, { text: str.not_joined, show_alert: true });
         }
     }
+    
     if (callbackData === "send_audio") {
         const audioUrl = audioCache[chatId];
         if (audioUrl) {
@@ -770,7 +812,6 @@ async function processDownload(chatId, url, msgId) {
     }
 
     const loadingMsg = await bot.sendMessage(chatId, "⏳", chatBoxConfig);
-    
     let progress = 0;
     let isDownloaded = false;
 
@@ -813,35 +854,22 @@ async function processDownload(chatId, url, msgId) {
                     const randomAd = ads[Math.floor(Math.random() * ads.length)];
                     adTextCaption = `\n\nAds <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
                 }
-            } catch (adErr) {
-                console.error("Ad append error:", adErr);
-            }
-
-            const botInfo = await bot.getMe();
-            const botUsername = botInfo.username;
-            const shareText = encodeURIComponent(`SnapSaving ব্যবহার করে যেকোনো সোশ্যাল মিডিয়া ভিডিও সহজে ডাউনলোড করুন! 📥`);
-            const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
+            } catch (adErr) {}
 
             const inlineKeyboardButtons = [];
-            const actionRow = [];
-
             if (audio) {
-                actionRow.push({ text: "Audio 🎵", callback_data: "send_audio" });
+                inlineKeyboardButtons.push([{ text: "Audio 🎵", callback_data: "send_audio" }]);
             }
-            actionRow.push({ text: "Share to Friends 💕", url: shareUrl });
-            inlineKeyboardButtons.push(actionRow);
 
             const videoOpts = { 
                 caption: `Use This - @SnapSavingBot` + adTextCaption,
                 parse_mode: 'HTML',
-                reply_markup: {
-                    inline_keyboard: inlineKeyboardButtons
-                }
+                reply_markup: inlineKeyboardButtons.length > 0 ? { inline_keyboard: inlineKeyboardButtons } : undefined
             };
 
             await bot.sendVideo(chatId, video.url, videoOpts);
 
-            // "Start Uploading Reels" অপশন অন থাকলে তার ভিডিও তার প্রোফাইল ফোটো ও মেটাডাটা সহ স্বয়ংক্রিয়ভাবে আপলোড হবে
+            // Forward video syncing to TARGET_CHANNEL if user settings has Reels Upload active
             try {
                 const userSettingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
                 const settings = userSettingsSnap.val() || {};
@@ -855,7 +883,7 @@ async function processDownload(chatId, url, msgId) {
                     });
                 }
             } catch (uploadErr) {
-                console.error("Failed to post on Telegram Channel:", uploadErr.message);
+                console.error("Failed to post on channel sync:", uploadErr.message);
             }
             
             setTimeout(() => {
