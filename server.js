@@ -6,7 +6,6 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
-// --- Global Error Handling ---
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception occurred:', err);
 });
@@ -23,10 +22,8 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const TARGET_CHANNEL = 'reelsuploder'; 
 const ADMIN_ID = '7304915019'; 
 
-// --- WebApp Domain Configuration ---
 const DOMAIN_NAME = process.env.DOMAIN_NAME || 'snapsaving-reels.vercel.app';
 
-// --- Multilingual Localization Strings (English Default) ---
 const strings = {
     en: {
         welcome: "Welcome to SnapSaving! Send me any social media video link to download.",
@@ -72,7 +69,6 @@ const strings = {
     }
 };
 
-// --- Firebase Initialization ---
 try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
         const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -98,8 +94,6 @@ const chatBoxConfig = {
         input_field_placeholder: "Send links to download"
     }
 };
-
-// --- Helper Functions ---
 
 async function getUserProfileInfo(userId) {
     try {
@@ -153,12 +147,10 @@ async function getSettingsKeyboard(chatId) {
     };
 }
 
-// --- Page Routes ---
 app.get('/', (req, res) => { res.send('Bot is running...'); });
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'indexadmin.html')); });
 app.get('/reels', (req, res) => { res.sendFile(path.join(__dirname, 'reels.html')); });
 
-// --- Admin Panel API Routes ---
 app.get('/api/admin/data', async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
@@ -294,8 +286,6 @@ app.post('/api/admin/broadcast', async (req, res) => {
     }
 });
 
-// --- Mini App API Routes (Updated with dynamic Admin Ads on Captions) ---
-
 app.get('/api/user/lang', async (req, res) => {
     const { userId } = req.query;
     if (!userId) return res.status(400).json({ error: "Missing userId" });
@@ -320,7 +310,6 @@ app.post('/api/videos', async (req, res) => {
         let videoList = Object.keys(data).map(key => {
             let video = { id: key, ...data[key] };
 
-            // Inject bold clickable ad into caption area
             if (ads.length > 0) {
                 const randomAd = ads[Math.floor(Math.random() * ads.length)];
                 video.caption = `<a href="${randomAd.link}" target="_blank" class="caption-link"><b>${randomAd.text}</b></a>`;
@@ -551,7 +540,6 @@ app.post('/api/user/settings', async (req, res) => {
     }
 });
 
-// --- Bot Language Helper ---
 async function getUserLang(chatId) {
     const snap = await db.ref(`users/${chatId}/lang`).once('value');
     return snap.val() || 'en'; 
@@ -589,7 +577,6 @@ bot.on('channel_post', async (msg) => {
     if (msg.chat && msg.chat.username && msg.chat.username.toLowerCase() === targetChannel.toLowerCase()) {
         if (msg.video) {
             try {
-                // Secondary check: ensures channel uploads match DB
                 const messageId = msg.message_id;
                 const dbRef = db.ref(`mini_app_videos/${messageId}`);
                 const snap = await dbRef.once('value');
@@ -876,7 +863,6 @@ async function processDownload(chatId, url, msgId, rawMsg) {
 
             const sentMsg = await bot.sendVideo(chatId, video.url, videoOpts);
 
-            // --- Instantly Sync with database and channel ---
             try {
                 const userSettingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
                 const settings = userSettingsSnap.val() || {};
@@ -888,26 +874,22 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                     const videoSizeMB = sentMsg.video.file_size ? `${(sentMsg.video.file_size / (1024 * 1024)).toFixed(2)} MB` : "Unknown Size";
                     const uploadDateStr = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Dhaka' });
 
-                    // Upload to channel
                     const channelPost = await bot.sendVideo(`@${TARGET_CHANNEL}`, sentMsg.video.file_id, {
                         caption: `Uploading Reels...`
                     });
                     const messageId = channelPost.message_id;
                     const finalAppLink = `https://t.me/SnapSavingBot/reels?startapp=${messageId}`;
 
-                    // Caption format matching exact request
                     const channelCaption = `Video link : ${finalAppLink}\n` +
                                            `Video Size : ${videoSizeMB}\n` +
                                            `Uploder : ${uploaderUsername}\n` +
                                            `Upload date : ${uploadDateStr}`;
 
-                    // Update channel post caption
                     await bot.editMessageCaption(channelCaption, {
                         chat_id: `@${TARGET_CHANNEL}`,
                         message_id: messageId
                     });
 
-                    // Database set matching exact request (captions will dynamically format inside APP)
                     await db.ref(`mini_app_videos/${messageId}`).set({
                         fileId: sentMsg.video.file_id,
                         fileSize: sentMsg.video.file_size || 0,
@@ -920,7 +902,6 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                         timestamp: admin.database.ServerValue.TIMESTAMP
                     });
 
-                    // Admin custom formatted notification
                     const adminMsg = `⚠️ <b>নতুন ভিডিও আপলোড হয়েছে!</b>\n\n` +
                                      `🔗 <b>Video link :</b> ${finalAppLink}\n` +
                                      `📦 <b>Video size :</b> ${videoSizeMB}\n` +
