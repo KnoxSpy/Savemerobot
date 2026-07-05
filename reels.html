@@ -207,7 +207,6 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
-        /* Profile Photo above Love Reaction with blue badge wrap */
         .uploader-panel-pic-wrapper {
             position: relative;
             width: 42px; height: 42px;
@@ -480,8 +479,11 @@
             <div class="sheet-header">
                 <div class="sheet-drag-handle"></div>
             </div>
-            <div class="profile-popup-info" style="margin-bottom: 12px;">
-                <img id="upModalPic" src="" alt="Profile">
+            <div class="profile-popup-info" style="margin-bottom: 12px; position: relative;">
+                <div style="position: relative;">
+                    <img id="upModalPic" src="" alt="Profile">
+                    <div id="upModalVerified" class="verified-badge" style="display: none; bottom: 0; right: 0; width: 18px; height: 18px; font-size: 10px;">✓</div>
+                </div>
                 <h4 id="upModalName">Uploader</h4>
             </div>
             
@@ -583,7 +585,6 @@
 
         function formatCaption(text) {
             if (!text) return "";
-            // If text contains HTML tags (such as Ads injected from API), render directly
             if (text.includes('<a') || text.includes('<strong') || text.includes('<b>')) {
                 return text;
             }
@@ -695,7 +696,7 @@
                             </div>
 
                             <div class="actions-panel">
-                                <!-- Profile Photo above Love Reaction with Blue Check Badges support -->
+                                <!-- Profile Photo with blue badge logic -->
                                 <div class="uploader-panel-pic-wrapper" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
                                     <div class="uploader-panel-pic">
                                         <img src="${uploaderPic}" alt="${uploaderName}">
@@ -749,6 +750,16 @@
             setupDoubleTap();
         }
 
+        // Optimized Autoplay sound workaround on user touch
+        function forceUnmuteActiveVideo() {
+            const currentVideo = document.querySelector(`.reel[data-index="${activeIndex}"] video`);
+            if (currentVideo && currentVideo.muted) {
+                currentVideo.muted = false;
+            }
+        }
+        document.addEventListener('touchstart', forceUnmuteActiveVideo, { once: true });
+        document.addEventListener('click', forceUnmuteActiveVideo, { once: true });
+
         function updateVideoSources(currentIndex) {
             const reels = document.querySelectorAll('.reel');
             reels.forEach((reel, i) => {
@@ -782,10 +793,11 @@
             const reelParent = videoElement.closest('.reel');
             if (reelParent && parseInt(reelParent.getAttribute('data-index')) === activeIndex) {
                 hideLoader();
-                // Forced smooth instant autoplay on load
+                // Ensure instant smooth autoplay with sound fallback
+                videoElement.muted = false;
                 videoElement.play().catch(() => {
                     videoElement.muted = true;
-                    videoElement.play().catch(e => console.log("Blocked", e));
+                    videoElement.play().catch(() => {});
                 });
             }
         }
@@ -799,6 +811,7 @@
         }
 
         function togglePlay(video) {
+            video.muted = false; // Unmute on explicit user interaction
             const playIndicator = video.parentElement.querySelector('.play-indicator');
             if (video.paused) {
                 video.play().then(() => {
@@ -862,7 +875,6 @@
             } catch (err) { console.error(err); }
         }
 
-        // Updated shared URL matching specifically: https://t.me/SnapSavingBot/reels
         function shareVideo(videoId, event) {
             if (event) event.stopPropagation();
             
@@ -890,38 +902,41 @@
             });
         }
 
-        // Handle profile interactions (Official badge toast vs popup page load)
         function handleUploaderClick(uploaderId, uploaderName, uploaderPic, size, date, views, videoId) {
             const isOfficial = uploaderName.toLowerCase().includes("reelsuploder") || 
                                uploaderName.toLowerCase().includes("reelsuploader") || 
                                uploaderId === "reelsuploder" || 
                                uploaderId === "-1002241516027";
 
-            if (isOfficial) {
-                showToast(`Official Reels Uploader Channel <span style="color:#1da1f2; font-weight:bold; margin-left:4px;">✔️</span>`);
-                return;
-            }
-
-            // Open popup sheet containing video specs and options
+            // Open bottom-sheet details popup
             document.getElementById('upModalPic').src = uploaderPic;
             document.getElementById('upModalName').innerText = uploaderName;
             document.getElementById('upModalSize').innerText = size || "Unknown Size";
             document.getElementById('upModalDate').innerText = date || "Unknown Date";
             document.getElementById('upModalViews').innerText = views || "0";
 
-            // Open external TG link on click
+            // Verified Badge render inside popup
+            const popupVerifiedBadge = document.getElementById('upModalVerified');
             const btnOpenProfile = document.getElementById('btnOpenTgProfile');
-            btnOpenProfile.onclick = function() {
-                const cleanUsername = uploaderName.replace('@', '');
-                const profileLink = `https://t.me/${cleanUsername}`;
-                if (tg) {
-                    tg.openTelegramLink(profileLink);
-                } else {
-                    window.open(profileLink, '_blank');
-                }
-            };
+            
+            if (isOfficial) {
+                popupVerifiedBadge.style.display = 'flex';
+                btnOpenProfile.style.display = 'none'; // Hide Open Profile button for official channel
+            } else {
+                popupVerifiedBadge.style.display = 'none';
+                btnOpenProfile.style.display = 'block'; // Show Open Profile button for users
+                
+                btnOpenProfile.onclick = function() {
+                    const cleanUsername = uploaderName.replace('@', '');
+                    const profileLink = `https://t.me/${cleanUsername}`;
+                    if (tg) {
+                        tg.openTelegramLink(profileLink);
+                    } else {
+                        window.open(profileLink, '_blank');
+                    }
+                };
+            }
 
-            // Setup report options inside sheet
             const btnReport = document.getElementById('btnReportVideoInSheet');
             btnReport.onclick = function() {
                 closeUploaderSheet();
@@ -991,6 +1006,9 @@
                             activeIndex = index;
                             updateVideoSources(activeIndex);
                             if (playIndicator) playIndicator.classList.remove('show');
+                            
+                            // Explicit play unmuted on swipe/intersection
+                            video.muted = false;
                             video.play().then(() => trackView(videoId)).catch(() => {
                                 video.muted = true;
                                 video.play().catch(() => {});
@@ -1035,16 +1053,26 @@
             let uploadingVal = true;
             let notificationVal = true;
 
+            // Load from local storage directly first to ensure instantaneous UI state representation
+            const localUpload = localStorage.getItem(`setting_upload_${uploaderId}`);
+            const localNotify = localStorage.getItem(`setting_notify_${uploaderId}`);
+            
+            if (localUpload !== null) uploadingVal = localUpload === 'true';
+            if (localNotify !== null) notificationVal = localNotify === 'true';
+
             try {
                 const res = await fetch(`/api/user/settings?userId=${uploaderId}`);
                 if (res.ok) {
                     const settings = await res.json();
                     uploadingVal = settings.uploadingReels !== false;
                     notificationVal = settings.notifications !== false;
+                    
+                    // Sync up local storage cache values
+                    localStorage.setItem(`setting_upload_${uploaderId}`, uploadingVal ? 'true' : 'false');
+                    localStorage.setItem(`setting_notify_${uploaderId}`, notificationVal ? 'true' : 'false');
                 }
             } catch (err) {
-                uploadingVal = localStorage.getItem(`setting_upload_${uploaderId}`) !== 'false';
-                notificationVal = localStorage.getItem(`setting_notify_${uploaderId}`) !== 'false';
+                console.log("Failed to sync modal settings with server, using local fallback");
             }
 
             document.getElementById('uploadToggle').checked = uploadingVal;
@@ -1069,8 +1097,9 @@
             const uploadingVal = document.getElementById('uploadToggle').checked;
             const notificationVal = document.getElementById('notificationToggle').checked;
 
-            localStorage.setItem(`setting_upload_${currentUser.id}`, uploadingVal);
-            localStorage.setItem(`setting_notify_${currentUser.id}`, notificationVal);
+            // Instantly sync up UI checking state cache to avoid toggling lagging representations
+            localStorage.setItem(`setting_upload_${currentUser.id}`, uploadingVal ? 'true' : 'false');
+            localStorage.setItem(`setting_notify_${currentUser.id}`, notificationVal ? 'true' : 'false');
 
             try {
                 await fetch('/api/user/settings', {
