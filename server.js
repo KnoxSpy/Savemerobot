@@ -32,7 +32,7 @@ const strings = {
         not_joined: "❌ You haven't joined all channels yet!",
         sending_audio: "Sending Audio...",
         video_not_found: "❌ Video not found.",
-        error_fetch: "❌ Error: Unable to fetch video.",
+        error_fetch: "❌ Something went wrong or the video could not be found. Please try another video link.",
         join_ch: "📢 Join Channel",
         join_gr: "👥 Join Group",
         add_gr: "➕ Add Bot to Group",
@@ -53,7 +53,7 @@ const strings = {
         not_joined: "❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!",
         sending_audio: "অডিও পাঠানো হচ্ছে...",
         video_not_found: "❌ ভিডিও পাওয়া যায়নি।",
-        error_fetch: "❌ দুঃখিত, ভিডিওটি ডাউনলোড করা সম্ভব হয়নি।",
+        error_fetch: "❌ কোন একটি সমস্যা হচ্ছে অথবা ভিডিও টি খুজে পাওয়া যায়নি অন্য ভিডিও লিংক দিন।",
         join_ch: "📢 চ্যানেলে জয়েন করুন",
         join_gr: "👥 গ্রুপে জয়েন করুন",
         add_gr: "➕ গ্রুপে বট যুক্ত করুন",
@@ -634,18 +634,30 @@ bot.on('message', async (msg) => {
             const welcomeMsg = data.welcomeText || str.welcome;
             const welcomeImg = data.welcomeImage || "https://telegra.ph/file/default.jpg";
 
-            const inlineKeyboard = [[{ text: str.watch_btn, url: "https://t.me/SnapSavingBot/reels" }]];
+            // Watch Video-র সাথে Language change option-টিও ইনলাইন কিবোর্ডে যুক্ত করা হয়েছে
+            const inlineKeyboard = [
+                [{ text: str.watch_btn, url: "https://t.me/SnapSavingBot/reels" }],
+                [{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]
+            ];
 
             try {
-                return await bot.sendPhoto(chatId, welcomeImg, {
+                await bot.sendPhoto(chatId, welcomeImg, {
                     caption: welcomeMsg,
                     reply_markup: { inline_keyboard: inlineKeyboard }
                 });
             } catch (imgErr) {
-                return await bot.sendMessage(chatId, welcomeMsg, {
+                await bot.sendMessage(chatId, welcomeMsg, {
                     reply_markup: { inline_keyboard: inlineKeyboard }
                 });
             }
+
+            // কিবোর্ড যেন মুছে না যায় বা চলে না যায় সেজন্য স্থায়ী মেসেজ ও কিবোর্ড পাঠানো হচ্ছে
+            const helperText = lang === 'bn'
+                ? "👇 নিচের বাটন থেকে আপনার ভাষা পরিবর্তন করতে পারেন অথবা যেকোনো ভিডিও লিংক পাঠান।"
+                : "👇 You can change your language using the button below or send any video link to download.";
+            
+            await bot.sendMessage(chatId, helperText, chatBoxConfig);
+
         } catch (e) { console.error("Start command processing error:", e); }
     }
 
@@ -695,16 +707,47 @@ bot.on('callback_query', async (q) => {
     if (callbackData === "setlang_bn" || callbackData === "setlang_en") {
         const newLang = callbackData === "setlang_bn" ? 'bn' : 'en';
         await db.ref(`users/${chatId}/lang`).set(newLang);
+        const updatedStr = strings[newLang];
         
-        const keyboard = await getSettingsKeyboard(chatId);
-        await bot.editMessageText(strings[newLang].settings_title, {
-            chat_id: chatId,
-            message_id: q.message.message_id,
-            parse_mode: 'HTML',
-            reply_markup: keyboard
-        }).catch(() => {});
+        // যদি /settings মেসেজ থেকে ভাষা পরিবর্তন করা হয়
+        if (q.message.text && q.message.text.includes(strings[lang].settings_title)) {
+            const keyboard = await getSettingsKeyboard(chatId);
+            await bot.editMessageText(updatedStr.settings_title, {
+                chat_id: chatId,
+                message_id: q.message.message_id,
+                parse_mode: 'HTML',
+                reply_markup: keyboard
+            }).catch(() => {});
+        } else {
+            // ইনলাইন কিবোর্ড থেকে ভাষা পরিবর্তন করলে সেই মেসেজটি আপডেট করা হচ্ছে
+            if (q.message.reply_markup && q.message.reply_markup.inline_keyboard) {
+                const oldKeyboard = q.message.reply_markup.inline_keyboard;
+                const newKeyboard = oldKeyboard.map(row => {
+                    return row.map(btn => {
+                        if (btn.callback_data === 'setlang_bn' || btn.callback_data === 'setlang_en') {
+                            return {
+                                text: updatedStr.lang_btn,
+                                callback_data: newLang === 'en' ? 'setlang_bn' : 'setlang_en'
+                            };
+                        }
+                        if (btn.text === strings[lang].watch_btn) {
+                            return { ...btn, text: updatedStr.watch_btn };
+                        }
+                        return btn;
+                    });
+                });
+                
+                await bot.editMessageReplyMarkup({ inline_keyboard: newKeyboard }, {
+                    chat_id: chatId,
+                    message_id: q.message.message_id
+                }).catch(() => {});
+            }
+        }
 
-        await bot.answerCallbackQuery(q.id, { text: strings[newLang].lang_switched });
+        await bot.answerCallbackQuery(q.id, { text: updatedStr.lang_switched });
+        
+        // মূল চ্যাটবক্স কিবোর্ডটি আপডেট রাখার জন্য মেসেজ পাঠানো হচ্ছে
+        await bot.sendMessage(chatId, updatedStr.lang_switched, chatBoxConfig);
         return;
     }
 
@@ -824,10 +867,11 @@ async function processDownload(chatId, url, msgId, rawMsg) {
     try {
         const res = await axios.get(`https://r-gengpt-api.vercel.app/api/video/download?url=${encodeURIComponent(url)}`);
         const data = res.data.data;
-        isDownloaded = true;
-        clearInterval(interval);
 
         if (data && data.medias) {
+            isDownloaded = true;
+            clearInterval(interval);
+
             await bot.editMessageText(`🪄 Success [${getProgressBar(100)}] 100%`, {
                 chat_id: chatId,
                 message_id: loadingMsg.message_id
@@ -854,6 +898,8 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             if (audio) {
                 inlineKeyboardButtons.push([{ text: "Audio 🎵", callback_data: "send_audio" }]);
             }
+            // ভিডিও মেসেজের ইনলাইনে ভাষা পরিবর্তনের বাটন যুক্ত করা হয়েছে
+            inlineKeyboardButtons.push([{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]);
 
             const videoOpts = { 
                 caption: `Use This - @SnapSavingBot` + adTextCaption,
@@ -924,12 +970,26 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                 bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             }, 1000);
         } else {
-            bot.editMessageText(str.video_not_found, { chat_id: chatId, message_id: loadingMsg.message_id });
+            // যদি রেসপন্স ডাটা না পাওয়া যায়
+            isDownloaded = true;
+            clearInterval(interval);
+            
+            // প্রথমে লোডিং (⏳) মেসেজটি ডিলেট করা হচ্ছে
+            await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
+            
+            // তারপর সমস্যা সম্পর্কিত টেক্সট পাঠানো হচ্ছে
+            await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
         }
     } catch (e) {
+        // অতিরিক্ত সাইজ বা যেকোনো ত্রুটিজনিত কারণে ডাউনলোডে সমস্যা হলে
         isDownloaded = true;
         clearInterval(interval);
-        bot.editMessageText(str.error_fetch, { chat_id: chatId, message_id: loadingMsg.message_id });
+        
+        // প্রথমে লোডিং (⏳) মেসেজটি ডিলেট করা হচ্ছে
+        await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
+        
+        // তারপর সমস্যা সম্পর্কিত টেক্সট পাঠানো হচ্ছে
+        await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
     }
 }
 
