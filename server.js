@@ -24,6 +24,7 @@ const ADMIN_ID = '7304915019';
 
 const DOMAIN_NAME = process.env.DOMAIN_NAME || 'snapsaving-reels.vercel.app';
 
+// নোটিফিকেশন ও নতুন বাটনগুলোর অনুবাদসহ strings ম্যাপ আপডেট করা হয়েছে
 const strings = {
     en: {
         welcome: "Welcome to SnapSaving! Send me any social media video link to download.",
@@ -32,7 +33,7 @@ const strings = {
         not_joined: "❌ You haven't joined all channels yet!",
         sending_audio: "Sending Audio...",
         video_not_found: "❌ Video not found.",
-        error_fetch: "❌ Something went wrong or the video could not be found. Please try another video link.",
+        error_fetch: "❌ Something went wrong or the video could not be found. Please send another video link.",
         join_ch: "📢 Join Channel",
         join_gr: "👥 Join Group",
         add_gr: "➕ Add Bot to Group",
@@ -44,7 +45,22 @@ const strings = {
         upload_on: "Reels Upload: ON 📤",
         upload_off: "Reels Upload: OFF 📥",
         change_lang: "Language: English 🌐",
-        watch_btn: "Watch Video"
+        watch_btn: "Watch Video",
+        
+        // Added Buttons
+        play_online: "Play Online Video 🎬",
+        get_music: "Get Music 🎵",
+        wrong_video: "Wrong Video ❌",
+        wrong_video_deleted: "✅ Video has been removed! Please send the link of the video you want to download.",
+        check_video: "Check Video 🎬",
+        
+        // Dynamic Notifications
+        notif_view_title: "👁️ <b>Someone watched your reel!</b>\n",
+        notif_like_title: "❤️ <b>Someone liked your reel!</b>\n",
+        notif_save_title: "💾 <b>Someone saved your reel directly in chat!</b>\n",
+        notif_name: "Name",
+        notif_total_views: "Total Views",
+        notif_total_likes: "Total Likes"
     },
     bn: {
         welcome: "SnapSaving-এ স্বাগতম! ভিডিও ডাউনলোড করতে যেকোনো লিংক পাঠান।",
@@ -65,7 +81,22 @@ const strings = {
         upload_on: "রিল আপলোড: চালু 📤",
         upload_off: "রিল আপলোড: বন্ধ 📥",
         change_lang: "ভাষা: বাংলা 🌐",
-        watch_btn: "Watch Video"
+        watch_btn: "Watch Video",
+        
+        // Added Buttons
+        play_online: "Play Online Video 🎬",
+        get_music: "Get Music 🎵",
+        wrong_video: "Wrong Video ❌",
+        wrong_video_deleted: "✅ ভিডিওটি রিমুভ করা হয়েছে! আপনি যে ভিডিও টি ডাউনলোড করতে চান লিংক দিন।",
+        check_video: "Check Video 🎬",
+        
+        // Dynamic Notifications
+        notif_view_title: "👁️ <b>কেউ আপনার রিলটি দেখেছে!</b>\n",
+        notif_like_title: "❤️ <b>কেউ আপনার রিলটি লাইক করেছে!</b>\n",
+        notif_save_title: "💾 <b>কেউ আপনার রিলটি চ্যাট থেকে সরাসরি সেভ করেছে!</b>\n",
+        notif_name: "নাম",
+        notif_total_views: "মোট ভিউ",
+        notif_total_likes: "মোট লাইক"
     }
 };
 
@@ -111,7 +142,8 @@ async function getUserProfileInfo(userId) {
     }
 }
 
-async function sendNotification(uploaderId, message) {
+// কাস্টম ডাইনামিক নোটিফিকেশন পাঠানোর ফাংশন (ভাষা, ভিউ ও বিজ্ঞপ্তিসহ)
+async function sendDynamicNotification(uploaderId, videoId, type, triggerUser = {}) {
     if (!uploaderId || uploaderId.startsWith('-100')) return;
     try {
         const settingsSnap = await db.ref(`users/${uploaderId}/settings`).once('value');
@@ -119,10 +151,55 @@ async function sendNotification(uploaderId, message) {
         const notificationsEnabled = settings.notifications !== false;
 
         if (notificationsEnabled) {
-            await bot.sendMessage(uploaderId, message, { parse_mode: 'HTML' });
+            const lang = await getUserLang(uploaderId);
+            const str = strings[lang];
+
+            // ডাটাবেজ থেকে রিয়েল-টাইম ভিউ ও লাইক সংখ্যা নিয়ে আসা
+            const videoSnap = await db.ref(`mini_app_videos/${videoId}`).once('value');
+            const video = videoSnap.val() || {};
+            const totalViews = video.views || 0;
+            const totalLikes = video.likes || 0;
+
+            // দর্শক/লাইকার-এর প্রোফাইল নাম ও তথ্য টেলিগ্রাম থেকে নিয়ে আসা
+            const profile = await getUserProfileInfo(triggerUser.id).catch(() => ({ name: "Anonymous" }));
+            const viewerName = profile.name || "Anonymous";
+
+            let message = "";
+            if (type === 'view') {
+                message = `${str.notif_view_title}` +
+                          `👤 <b>${str.notif_name}:</b> ${viewerName}\n` +
+                          `📊 <b>${str.notif_total_views}:</b> ${totalViews}`;
+            } else if (type === 'like') {
+                message = `${str.notif_like_title}` +
+                          `👤 <b>${str.notif_name}:</b> ${viewerName}\n` +
+                          `📊 <b>${str.notif_total_likes}:</b> ${totalLikes}`;
+            } else if (type === 'save') {
+                message = `${str.notif_save_title}` +
+                          `👤 <b>${str.notif_name}:</b> ${viewerName}`;
+            }
+
+            // এডমিন প্যানেলের সেভ করা এডস যুক্ত করা
+            const adminSnap = await db.ref('admin_settings').once('value');
+            const adminSettings = adminSnap.val() || {};
+            const ads = adminSettings.ads || [];
+            if (ads.length > 0) {
+                const randomAd = ads[Math.floor(Math.random() * ads.length)];
+                message += `\n\n<b>Ads:</b> <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
+            }
+
+            // Mini App ওপেন করে সরাসরি ওই ভিডিও প্লে করার ইনলাইন বাটন
+            const inlineKeyboard = [[{
+                text: str.check_video,
+                url: `https://t.me/SnapSavingBot/reels?startapp=${videoId}`
+            }]];
+
+            await bot.sendMessage(uploaderId, message, {
+                parse_mode: 'HTML',
+                reply_markup: { inline_keyboard: inlineKeyboard }
+            });
         }
     } catch (err) {
-        console.error("Failed to send notification:", err.message);
+        console.error("Failed to send dynamic notification:", err.message);
     }
 }
 
@@ -403,6 +480,7 @@ app.get('/api/video/stream/:fileId', async (req, res) => {
     }
 });
 
+// লাইক নোটিফিকেশন আপডেট
 app.post('/api/video/like', async (req, res) => {
     const { videoId, isLiked, userId, username } = req.body;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
@@ -423,8 +501,7 @@ app.post('/api/video/like', async (req, res) => {
         });
 
         if (isLiked && video.uploaderId && video.uploaderId !== userId) {
-            const likerName = username ? `@${username}` : "Someone";
-            await sendNotification(video.uploaderId, `❤️ <b>${likerName}</b> liked your reel!`);
+            await sendDynamicNotification(video.uploaderId, videoId, 'like', { id: userId });
         }
 
         res.json({ success: true });
@@ -433,6 +510,7 @@ app.post('/api/video/like', async (req, res) => {
     }
 });
 
+// ভিউ নোটিফিকেশন আপডেট
 app.post('/api/video/view', async (req, res) => {
     const { videoId, userId } = req.body;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
@@ -447,7 +525,7 @@ app.post('/api/video/view', async (req, res) => {
         await videoRef.child('views').transaction((currentViews) => (currentViews || 0) + 1);
 
         if (video.uploaderId && video.uploaderId !== userId) {
-            await sendNotification(video.uploaderId, `👁️ Someone watched your reel!`);
+            await sendDynamicNotification(video.uploaderId, videoId, 'view', { id: userId });
         }
 
         res.json({ success: true });
@@ -456,6 +534,7 @@ app.post('/api/video/view', async (req, res) => {
     }
 });
 
+// সেভ নোটিফিকেশন আপডেট
 app.post('/api/video/save', async (req, res) => {
     const { videoId, userId, isSaved } = req.body;
     if (!videoId || !userId) return res.status(400).json({ error: "Missing parameters" });
@@ -473,7 +552,7 @@ app.post('/api/video/save', async (req, res) => {
             });
 
             if (video.uploaderId && video.uploaderId !== userId) {
-                await sendNotification(video.uploaderId, `💾 Someone saved your reel directly in chat!`);
+                await sendDynamicNotification(video.uploaderId, videoId, 'save', { id: userId });
             }
         }
         res.json({ success: true });
@@ -634,7 +713,6 @@ bot.on('message', async (msg) => {
             const welcomeMsg = data.welcomeText || str.welcome;
             const welcomeImg = data.welcomeImage || "https://telegra.ph/file/default.jpg";
 
-            // Watch Video-র সাথে Language change option-টিও ইনলাইন কিবোর্ডে যুক্ত করা হয়েছে
             const inlineKeyboard = [
                 [{ text: str.watch_btn, url: "https://t.me/SnapSavingBot/reels" }],
                 [{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]
@@ -651,7 +729,6 @@ bot.on('message', async (msg) => {
                 });
             }
 
-            // কিবোর্ড যেন মুছে না যায় বা চলে না যায় সেজন্য স্থায়ী মেসেজ ও কিবোর্ড পাঠানো হচ্ছে
             const helperText = lang === 'bn'
                 ? "👇 নিচের বাটন থেকে আপনার ভাষা পরিবর্তন করতে পারেন অথবা যেকোনো ভিডিও লিংক পাঠান।"
                 : "👇 You can change your language using the button below or send any video link to download.";
@@ -709,7 +786,6 @@ bot.on('callback_query', async (q) => {
         await db.ref(`users/${chatId}/lang`).set(newLang);
         const updatedStr = strings[newLang];
         
-        // যদি /settings মেসেজ থেকে ভাষা পরিবর্তন করা হয়
         if (q.message.text && q.message.text.includes(strings[lang].settings_title)) {
             const keyboard = await getSettingsKeyboard(chatId);
             await bot.editMessageText(updatedStr.settings_title, {
@@ -719,7 +795,6 @@ bot.on('callback_query', async (q) => {
                 reply_markup: keyboard
             }).catch(() => {});
         } else {
-            // ইনলাইন কিবোর্ড থেকে ভাষা পরিবর্তন করলে সেই মেসেজটি আপডেট করা হচ্ছে
             if (q.message.reply_markup && q.message.reply_markup.inline_keyboard) {
                 const oldKeyboard = q.message.reply_markup.inline_keyboard;
                 const newKeyboard = oldKeyboard.map(row => {
@@ -733,6 +808,15 @@ bot.on('callback_query', async (q) => {
                         if (btn.text === strings[lang].watch_btn) {
                             return { ...btn, text: updatedStr.watch_btn };
                         }
+                        if (btn.text === strings[lang].play_online) {
+                            return { ...btn, text: updatedStr.play_online };
+                        }
+                        if (btn.text === strings[lang].get_music) {
+                            return { ...btn, text: updatedStr.get_music };
+                        }
+                        if (btn.text === strings[lang].wrong_video) {
+                            return { ...btn, text: updatedStr.wrong_video };
+                        }
                         return btn;
                     });
                 });
@@ -745,8 +829,6 @@ bot.on('callback_query', async (q) => {
         }
 
         await bot.answerCallbackQuery(q.id, { text: updatedStr.lang_switched });
-        
-        // মূল চ্যাটবক্স কিবোর্ডটি আপডেট রাখার জন্য মেসেজ পাঠানো হচ্ছে
         await bot.sendMessage(chatId, updatedStr.lang_switched, chatBoxConfig);
         return;
     }
@@ -793,6 +875,7 @@ bot.on('callback_query', async (q) => {
         const messageId = callbackData.replace("remove_vid_", "");
         try {
             await db.ref(`mini_app_videos/${messageId}`).remove();
+            await bot.deleteMessage(`@${TARGET_CHANNEL}`, parseInt(messageId)).catch(() => {});
             
             await bot.editMessageText(`✅ <b>ভিডিওটি অ্যাপ এবং সার্ভার থেকে রিমুভ করা হয়েছে!</b>`, {
                 chat_id: q.message.chat.id,
@@ -801,6 +884,22 @@ bot.on('callback_query', async (q) => {
             });
             
             await bot.answerCallbackQuery(q.id, { text: "Removed successfully from app!" });
+        } catch (err) {
+            await bot.answerCallbackQuery(q.id, { text: "Error deleting video.", show_alert: true });
+        }
+        return;
+    }
+
+    // Wrong Video ক্লিক করলে ডাটাবেজ ও চ্যানেল থেকে ডিলেট হয়ে যাবে এবং নতুন রিকোয়েস্ট পাঠাতে বলবে
+    if (callbackData.startsWith("wrong_video_")) {
+        const messageId = callbackData.replace("wrong_video_", "");
+        try {
+            await db.ref(`mini_app_videos/${messageId}`).remove();
+            await bot.deleteMessage(`@${TARGET_CHANNEL}`, parseInt(messageId)).catch(() => {});
+            await bot.deleteMessage(chatId, q.message.message_id).catch(() => {});
+            
+            await bot.sendMessage(chatId, str.wrong_video_deleted, chatBoxConfig);
+            await bot.answerCallbackQuery(q.id, { text: "Removed successfully!" });
         } catch (err) {
             await bot.answerCallbackQuery(q.id, { text: "Error deleting video.", show_alert: true });
         }
@@ -894,37 +993,29 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                 }
             } catch (adErr) {}
 
-            const inlineKeyboardButtons = [];
-            if (audio) {
-                inlineKeyboardButtons.push([{ text: "Audio 🎵", callback_data: "send_audio" }]);
-            }
-            // ভিডিও মেসেজের ইনলাইনে ভাষা পরিবর্তনের বাটন যুক্ত করা হয়েছে
-            inlineKeyboardButtons.push([{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]);
+            let messageId = null;
+            let finalAppLink = `https://t.me/SnapSavingBot/reels`;
 
-            const videoOpts = { 
-                caption: `Use This - @SnapSavingBot` + adTextCaption,
-                parse_mode: 'HTML',
-                reply_markup: inlineKeyboardButtons.length > 0 ? { inline_keyboard: inlineKeyboardButtons } : undefined
-            };
+            const userSettingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
+            const userSettings = userSettingsSnap.val() || {};
+            const uploadingReels = userSettings.uploadingReels !== false;
 
-            const sentMsg = await bot.sendVideo(chatId, video.url, videoOpts);
-
-            try {
-                const userSettingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
-                const settings = userSettingsSnap.val() || {};
-                const uploadingReels = settings.uploadingReels !== false;
-
-                if (uploadingReels) {
+            // আপলোড রিল চালু থাকলে আগে রিল চ্যানেলে পাঠানো হবে এবং message_id সংগ্রহ করা হবে
+            if (uploadingReels) {
+                try {
                     const profile = await getUserProfileInfo(chatId);
                     const uploaderUsername = rawMsg.from && rawMsg.from.username ? `@${rawMsg.from.username}` : (rawMsg.from && rawMsg.from.first_name || "Guest_User");
-                    const videoSizeMB = sentMsg.video.file_size ? `${(sentMsg.video.file_size / (1024 * 1024)).toFixed(2)} MB` : "Unknown Size";
                     const uploadDateStr = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Dhaka' });
 
-                    const channelPost = await bot.sendVideo(`@${TARGET_CHANNEL}`, sentMsg.video.file_id, {
+                    const channelPost = await bot.sendVideo(`@${TARGET_CHANNEL}`, video.url, {
                         caption: `Uploading Reels...`
                     });
-                    const messageId = channelPost.message_id;
-                    const finalAppLink = `https://t.me/SnapSavingBot/reels?startapp=${messageId}`;
+                    messageId = channelPost.message_id;
+                    finalAppLink = `https://t.me/SnapSavingBot/reels?startapp=${messageId}`;
+
+                    const videoSizeMB = channelPost.video && channelPost.video.file_size 
+                        ? `${(channelPost.video.file_size / (1024 * 1024)).toFixed(2)} MB` 
+                        : "Unknown Size";
 
                     const channelCaption = `Video link : ${finalAppLink}\n` +
                                            `Video Size : ${videoSizeMB}\n` +
@@ -937,8 +1028,8 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                     });
 
                     await db.ref(`mini_app_videos/${messageId}`).set({
-                        fileId: sentMsg.video.file_id,
-                        fileSize: sentMsg.video.file_size || 0,
+                        fileId: channelPost.video.file_id,
+                        fileSize: channelPost.video.file_size || 0,
                         caption: "", 
                         likes: 0,
                         views: 0,
@@ -961,34 +1052,62 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                             ]
                         }
                     });
+                } catch (uploadErr) {
+                    console.error("Direct db sync alert failed:", uploadErr.message);
                 }
-            } catch (uploadErr) {
-                console.error("Direct db sync alert failed:", uploadErr.message);
             }
+
+            // ৩টি ইনলাইন বাটন সাজানো হচ্ছে (Play Online Video, Get Music, Wrong Video)
+            const inlineKeyboardButtons = [];
+            
+            // Row 1: Play Online Video
+            inlineKeyboardButtons.push([{ text: str.play_online, url: finalAppLink }]);
+
+            // Row 2: Get Music এবং Wrong Video পাশাপাশি
+            const row2 = [];
+            if (audio) {
+                row2.push({ text: str.get_music, callback_data: "send_audio" });
+            }
+            if (messageId) {
+                row2.push({ text: str.wrong_video, callback_data: `wrong_video_${messageId}` });
+            }
+            if (row2.length > 0) {
+                inlineKeyboardButtons.push(row2);
+            }
+
+            // Row 3: ভাষা পরিবর্তনের বাটন
+            inlineKeyboardButtons.push([{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]);
+
+            const videoOpts = { 
+                caption: `Use This - @SnapSavingBot` + adTextCaption,
+                parse_mode: 'HTML',
+                reply_markup: { inline_keyboard: inlineKeyboardButtons }
+            };
+
+            // যদি ভিডিওটি সফলভাবে আপলোড হয়ে থাকে তাহলে file_id ব্যবহার করা হবে, অন্যথায় মূল url
+            let finalVideoSource = video.url;
+            if (messageId && uploadingReels) {
+                const snap = await db.ref(`mini_app_videos/${messageId}`).once('value');
+                if (snap.exists() && snap.val().fileId) {
+                    finalVideoSource = snap.val().fileId;
+                }
+            }
+
+            await bot.sendVideo(chatId, finalVideoSource, videoOpts);
             
             setTimeout(() => {
                 bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             }, 1000);
         } else {
-            // যদি রেসপন্স ডাটা না পাওয়া যায়
             isDownloaded = true;
             clearInterval(interval);
-            
-            // প্রথমে লোডিং (⏳) মেসেজটি ডিলেট করা হচ্ছে
             await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
-            
-            // তারপর সমস্যা সম্পর্কিত টেক্সট পাঠানো হচ্ছে
             await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
         }
     } catch (e) {
-        // অতিরিক্ত সাইজ বা যেকোনো ত্রুটিজনিত কারণে ডাউনলোডে সমস্যা হলে
         isDownloaded = true;
         clearInterval(interval);
-        
-        // প্রথমে লোডিং (⏳) মেসেজটি ডিলেট করা হচ্ছে
         await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
-        
-        // তারপর সমস্যা সম্পর্কিত টেক্সট পাঠানো হচ্ছে
         await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
     }
 }
