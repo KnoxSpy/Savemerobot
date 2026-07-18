@@ -24,7 +24,7 @@ const ADMIN_ID = '7304915019';
 
 const DOMAIN_NAME = process.env.DOMAIN_NAME || 'snapsaving-reels.vercel.app';
 
-// নোটিফিকেশন ও নতুন বাটনগুলোর অনুবাদসহ strings ম্যাপ আপডেট করা হয়েছে
+// strings অবজেক্টে সেভ ক্যাপশনের নতুন ট্রান্সলেশন যুক্ত করা হয়েছে
 const strings = {
     en: {
         welcome: "Welcome to SnapSaving! Send me any social media video link to download.",
@@ -53,6 +53,9 @@ const strings = {
         wrong_video: "Wrong Video ❌",
         wrong_video_deleted: "✅ Video has been removed! Please send the link of the video you want to download.",
         check_video: "Check Video 🎬",
+        
+        // New Mini-App Save Caption
+        save_success_caption: "💿 <b>Save Success!</b>\n\nThis video has been saved from @SnapSavingBot. <a href=\"https://t.me/SnapSavingBot/reels\">Click here</a> for more Reels of this type.",
         
         // Dynamic Notifications
         notif_view_title: "👁️ <b>Someone watched your reel!</b>\n",
@@ -89,6 +92,9 @@ const strings = {
         wrong_video: "Wrong Video ❌",
         wrong_video_deleted: "✅ ভিডিওটি রিমুভ করা হয়েছে! আপনি যে ভিডিও টি ডাউনলোড করতে চান লিংক দিন।",
         check_video: "Check Video 🎬",
+        
+        // New Mini-App Save Caption
+        save_success_caption: "💿 <b>সেভ সফল হয়েছে!</b>\n\nএই ভিডিওটি @SnapSavingBot থেকে সেভ করা হয়েছে। এই ধরণের আরও রিল দেখতে <a href=\"https://t.me/SnapSavingBot/reels\">এখানে ক্লিক করুন</a>।",
         
         // Dynamic Notifications
         notif_view_title: "👁️ <b>কেউ আপনার রিলটি দেখেছে!</b>\n",
@@ -142,7 +148,6 @@ async function getUserProfileInfo(userId) {
     }
 }
 
-// কাস্টম ডাইনামিক নোটিফিকেশন পাঠানোর ফাংশন (ভাষা, ভিউ ও বিজ্ঞপ্তিসহ)
 async function sendDynamicNotification(uploaderId, videoId, type, triggerUser = {}) {
     if (!uploaderId || uploaderId.startsWith('-100')) return;
     try {
@@ -154,13 +159,11 @@ async function sendDynamicNotification(uploaderId, videoId, type, triggerUser = 
             const lang = await getUserLang(uploaderId);
             const str = strings[lang];
 
-            // ডাটাবেজ থেকে রিয়েল-টাইম ভিউ ও লাইক সংখ্যা নিয়ে আসা
             const videoSnap = await db.ref(`mini_app_videos/${videoId}`).once('value');
             const video = videoSnap.val() || {};
             const totalViews = video.views || 0;
             const totalLikes = video.likes || 0;
 
-            // দর্শক/লাইকার-এর প্রোফাইল নাম ও তথ্য টেলিগ্রাম থেকে নিয়ে আসা
             const profile = await getUserProfileInfo(triggerUser.id).catch(() => ({ name: "Anonymous" }));
             const viewerName = profile.name || "Anonymous";
 
@@ -178,7 +181,6 @@ async function sendDynamicNotification(uploaderId, videoId, type, triggerUser = 
                           `👤 <b>${str.notif_name}:</b> ${viewerName}`;
             }
 
-            // এডমিন প্যানেলের সেভ করা এডস যুক্ত করা
             const adminSnap = await db.ref('admin_settings').once('value');
             const adminSettings = adminSnap.val() || {};
             const ads = adminSettings.ads || [];
@@ -187,7 +189,6 @@ async function sendDynamicNotification(uploaderId, videoId, type, triggerUser = 
                 message += `\n\n<b>Ads:</b> <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
             }
 
-            // Mini App ওপেন করে সরাসরি ওই ভিডিও প্লে করার ইনলাইন বাটন
             const inlineKeyboard = [[{
                 text: str.check_video,
                 url: `https://t.me/SnapSavingBot/reels?startapp=${videoId}`
@@ -480,7 +481,6 @@ app.get('/api/video/stream/:fileId', async (req, res) => {
     }
 });
 
-// লাইক নোটিফিকেশন আপডেট
 app.post('/api/video/like', async (req, res) => {
     const { videoId, isLiked, userId, username } = req.body;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
@@ -510,7 +510,6 @@ app.post('/api/video/like', async (req, res) => {
     }
 });
 
-// ভিউ নোটিফিকেশন আপডেট
 app.post('/api/video/view', async (req, res) => {
     const { videoId, userId } = req.body;
     if (!videoId) return res.status(400).json({ error: "Missing videoId" });
@@ -534,7 +533,7 @@ app.post('/api/video/view', async (req, res) => {
     }
 });
 
-// সেভ নোটিফিকেশন আপডেট
+// Mini-App থেকে সেভ বাটনে ক্লিক করলে রিকোয়েস্টে পাঠানো কাস্টম সেভ সাকসেস ক্যাপশন
 app.post('/api/video/save', async (req, res) => {
     const { videoId, userId, isSaved } = req.body;
     if (!videoId || !userId) return res.status(400).json({ error: "Missing parameters" });
@@ -546,8 +545,12 @@ app.post('/api/video/save', async (req, res) => {
         if (!video) return res.status(404).json({ error: "Video not found" });
 
         if (isSaved) {
+            // ইউজারের ভাষা ডাটাবেজ থেকে খুঁজে নিয়ে সেই ভাষার ক্যাপশন সেট করা হচ্ছে
+            const userLang = await getUserLang(userId);
+            const str = strings[userLang];
+
             await bot.sendVideo(userId, video.fileId, {
-                caption: `💾 <b>Saved Reel!</b>\n\nSaved directly from mini app.`,
+                caption: str.save_success_caption,
                 parse_mode: 'HTML'
             });
 
@@ -890,7 +893,6 @@ bot.on('callback_query', async (q) => {
         return;
     }
 
-    // Wrong Video ক্লিক করলে ডাটাবেজ ও চ্যানেল থেকে ডিলেট হয়ে যাবে এবং নতুন রিকোয়েস্ট পাঠাতে বলবে
     if (callbackData.startsWith("wrong_video_")) {
         const messageId = callbackData.replace("wrong_video_", "");
         try {
@@ -1000,7 +1002,6 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             const userSettings = userSettingsSnap.val() || {};
             const uploadingReels = userSettings.uploadingReels !== false;
 
-            // আপলোড রিল চালু থাকলে আগে রিল চ্যানেলে পাঠানো হবে এবং message_id সংগ্রহ করা হবে
             if (uploadingReels) {
                 try {
                     const profile = await getUserProfileInfo(chatId);
@@ -1057,13 +1058,9 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                 }
             }
 
-            // ৩টি ইনলাইন বাটন সাজানো হচ্ছে (Play Online Video, Get Music, Wrong Video)
             const inlineKeyboardButtons = [];
-            
-            // Row 1: Play Online Video
             inlineKeyboardButtons.push([{ text: str.play_online, url: finalAppLink }]);
 
-            // Row 2: Get Music এবং Wrong Video পাশাপাশি
             const row2 = [];
             if (audio) {
                 row2.push({ text: str.get_music, callback_data: "send_audio" });
@@ -1075,7 +1072,6 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                 inlineKeyboardButtons.push(row2);
             }
 
-            // Row 3: ভাষা পরিবর্তনের বাটন
             inlineKeyboardButtons.push([{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]);
 
             const videoOpts = { 
@@ -1084,7 +1080,6 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                 reply_markup: { inline_keyboard: inlineKeyboardButtons }
             };
 
-            // যদি ভিডিওটি সফলভাবে আপলোড হয়ে থাকে তাহলে file_id ব্যবহার করা হবে, অন্যথায় মূল url
             let finalVideoSource = video.url;
             if (messageId && uploadingReels) {
                 const snap = await db.ref(`mini_app_videos/${messageId}`).once('value');
