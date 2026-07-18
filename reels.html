@@ -1,1110 +1,1537 @@
-const express = require('express');
-const TelegramBot = require('node-telegram-bot-api');
-const axios = require('axios');
-const admin = require('firebase-admin');
-const path = require('path');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Reels</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception occurred:', err);
-});
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-const app = express();
-app.use(cors());
-app.use(bodyParser.json());
-
-const PORT = process.env.PORT || 3000;
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const TARGET_CHANNEL = 'reelsuploder'; 
-const ADMIN_ID = '7304915019'; 
-
-const DOMAIN_NAME = process.env.DOMAIN_NAME || 'snapsaving-reels.vercel.app';
-
-// strings অবজেক্টে সেভ ক্যাপশনের নতুন ট্রান্সলেশন যুক্ত করা হয়েছে
-const strings = {
-    en: {
-        welcome: "Welcome to SnapSaving! Send me any social media video link to download.",
-        must_join: "⚠️ You must join our channels to use this bot!",
-        verify: "✅ Verify Join",
-        not_joined: "❌ You haven't joined all channels yet!",
-        sending_audio: "Sending Audio...",
-        video_not_found: "❌ Video not found.",
-        error_fetch: "❌ Something went wrong or the video could not be found. Please send another video link.",
-        join_ch: "📢 Join Channel",
-        join_gr: "👥 Join Group",
-        add_gr: "➕ Add Bot to Group",
-        lang_btn: "🇧🇩 Change to বাংলা",
-        lang_switched: "Language changed to English.",
-        settings_title: "⚙️ <b>Your Preferences & Settings</b>\n\nConfigure your Mini-App settings directly from here:",
-        notify_on: "Notifications: ON 🔔",
-        notify_off: "Notifications: OFF 🔕",
-        upload_on: "Reels Upload: ON 📤",
-        upload_off: "Reels Upload: OFF 📥",
-        change_lang: "Language: English 🌐",
-        watch_btn: "Watch Video",
-        
-        // Added Buttons
-        play_online: "Play Online Video 🎬",
-        get_music: "Get Music 🎵",
-        wrong_video: "Wrong Video ❌",
-        wrong_video_deleted: "✅ Video has been removed! Please send the link of the video you want to download.",
-        check_video: "Check Video 🎬",
-        
-        // New Mini-App Save Caption
-        save_success_caption: "💿 <b>Save Success!</b>\n\nThis video has been saved from @SnapSavingBot. <a href=\"https://t.me/SnapSavingBot/reels\">Click here</a> for more Reels of this type.",
-        
-        // Dynamic Notifications
-        notif_view_title: "👁️ <b>Someone watched your reel!</b>\n",
-        notif_like_title: "❤️ <b>Someone liked your reel!</b>\n",
-        notif_save_title: "💾 <b>Someone saved your reel directly in chat!</b>\n",
-        notif_name: "Name",
-        notif_total_views: "Total Views",
-        notif_total_likes: "Total Likes"
-    },
-    bn: {
-        welcome: "SnapSaving-এ স্বাগতম! ভিডিও ডাউনলোড করতে যেকোনো লিংক পাঠান।",
-        must_join: "⚠️ আমাদের চ্যানেলে জয়েন করতে হবে এই বটটি ব্যবহার করতে!",
-        verify: "✅ ভেরিফাই করুন",
-        not_joined: "❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!",
-        sending_audio: "অডিও পাঠানো হচ্ছে...",
-        video_not_found: "❌ ভিডিও পাওয়া যায়নি।",
-        error_fetch: "❌ কোন একটি সমস্যা হচ্ছে অথবা ভিডিও টি খুজে পাওয়া যায়নি অন্য ভিডিও লিংক দিন।",
-        join_ch: "📢 চ্যানেলে জয়েন করুন",
-        join_gr: "👥 গ্রুপে জয়েন করুন",
-        add_gr: "➕ গ্রুপে বট যুক্ত করুন",
-        lang_btn: "🇬🇧 Change to English",
-        lang_switched: "ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
-        settings_title: "⚙️ <b>আপনার সেটিংস ও পছন্দসমূহ</b>\n\nনিচের বাটনগুলো দিয়ে আপনার মিনি অ্যাপের সেটিংস পরিবর্তন করুন:",
-        notify_on: "নোটিফিকেশন: চালু 🔔",
-        notify_off: "নোটিফিকেশন: বন্ধ 🔕",
-        upload_on: "রিল আপলোড: চালু 📤",
-        upload_off: "রিল আপলোড: বন্ধ 📥",
-        change_lang: "ভাষা: বাংলা 🌐",
-        watch_btn: "Watch Video",
-        
-        // Added Buttons
-        play_online: "Play Online Video 🎬",
-        get_music: "Get Music 🎵",
-        wrong_video: "Wrong Video ❌",
-        wrong_video_deleted: "✅ ভিডিওটি রিমুভ করা হয়েছে! আপনি যে ভিডিও টি ডাউনলোড করতে চান লিংক দিন।",
-        check_video: "Check Video 🎬",
-        
-        // New Mini-App Save Caption
-        save_success_caption: "💿 <b>সেভ সফল হয়েছে!</b>\n\nএই ভিডিওটি @SnapSavingBot থেকে সেভ করা হয়েছে। এই ধরণের আরও রিল দেখতে <a href=\"https://t.me/SnapSavingBot/reels\">এখানে ক্লিক করুন</a>।",
-        
-        // Dynamic Notifications
-        notif_view_title: "👁️ <b>কেউ আপনার রিলটি দেখেছে!</b>\n",
-        notif_like_title: "❤️ <b>কেউ আপনার রিলটি লাইক করেছে!</b>\n",
-        notif_save_title: "💾 <b>কেউ আপনার রিলটি চ্যাট থেকে সরাসরি সেভ করেছে!</b>\n",
-        notif_name: "নাম",
-        notif_total_views: "মোট ভিউ",
-        notif_total_likes: "মোট লাইক"
-    }
-};
-
-try {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            databaseURL: process.env.FIREBASE_DB_URL
-        });
-        console.log("Firebase initialized successfully.");
-    }
-} catch (error) {
-    console.error("Firebase Init Error:", error.message);
-}
-
-const db = admin.database();
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
-const userSessions = {}; 
-const audioCache = {}; 
-
-const chatBoxConfig = {
-    reply_markup: {
-        keyboard: [[{ text: "🇧🇩 বাংলা / 🇬🇧 English" }]],
-        resize_keyboard: true,
-        input_field_placeholder: "Send links to download"
-    }
-};
-
-async function getUserProfileInfo(userId) {
-    try {
-        const chat = await bot.getChat(userId);
-        const name = chat.first_name ? `${chat.first_name} ${chat.last_name || ''}`.trim() : (chat.title || chat.username || "Anonymous");
-        
-        let photoUrl = "https://via.placeholder.com/150";
-        if (chat.photo && chat.photo.small_file_id) {
-            const file = await bot.getFile(chat.photo.small_file_id);
-            photoUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-        }
-        return { name, photoUrl };
-    } catch (err) {
-        return { name: "Anonymous", photoUrl: "https://via.placeholder.com/150" };
-    }
-}
-
-async function sendDynamicNotification(uploaderId, videoId, type, triggerUser = {}) {
-    if (!uploaderId || uploaderId.startsWith('-100')) return;
-    try {
-        const settingsSnap = await db.ref(`users/${uploaderId}/settings`).once('value');
-        const settings = settingsSnap.val() || {};
-        const notificationsEnabled = settings.notifications !== false;
-
-        if (notificationsEnabled) {
-            const lang = await getUserLang(uploaderId);
-            const str = strings[lang];
-
-            const videoSnap = await db.ref(`mini_app_videos/${videoId}`).once('value');
-            const video = videoSnap.val() || {};
-            const totalViews = video.views || 0;
-            const totalLikes = video.likes || 0;
-
-            const profile = await getUserProfileInfo(triggerUser.id).catch(() => ({ name: "Anonymous" }));
-            const viewerName = profile.name || "Anonymous";
-
-            let message = "";
-            if (type === 'view') {
-                message = `${str.notif_view_title}` +
-                          `👤 <b>${str.notif_name}:</b> ${viewerName}\n` +
-                          `📊 <b>${str.notif_total_views}:</b> ${totalViews}`;
-            } else if (type === 'like') {
-                message = `${str.notif_like_title}` +
-                          `👤 <b>${str.notif_name}:</b> ${viewerName}\n` +
-                          `📊 <b>${str.notif_total_likes}:</b> ${totalLikes}`;
-            } else if (type === 'save') {
-                message = `${str.notif_save_title}` +
-                          `👤 <b>${str.notif_name}:</b> ${viewerName}`;
-            }
-
-            const adminSnap = await db.ref('admin_settings').once('value');
-            const adminSettings = adminSnap.val() || {};
-            const ads = adminSettings.ads || [];
-            if (ads.length > 0) {
-                const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                message += `\n\n<b>Ads:</b> <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
-            }
-
-            const inlineKeyboard = [[{
-                text: str.check_video,
-                url: `https://t.me/SnapSavingBot/reels?startapp=${videoId}`
-            }]];
-
-            await bot.sendMessage(uploaderId, message, {
-                parse_mode: 'HTML',
-                reply_markup: { inline_keyboard: inlineKeyboard }
-            });
-        }
-    } catch (err) {
-        console.error("Failed to send dynamic notification:", err.message);
-    }
-}
-
-async function getSettingsKeyboard(chatId) {
-    const lang = await getUserLang(chatId);
-    const str = strings[lang];
-
-    const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
-    const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
-
-    const notifyBtnText = settings.notifications !== false ? str.notify_on : str.notify_off;
-    const uploadBtnText = settings.uploadingReels !== false ? str.upload_on : str.upload_off;
-
-    return {
-        inline_keyboard: [
-            [{ text: str.change_lang, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }],
-            [
-                { text: notifyBtnText, callback_data: 'toggle_notify' },
-                { text: uploadBtnText, callback_data: 'toggle_upload' }
-            ]
-        ]
-    };
-}
-
-app.get('/', (req, res) => { res.send('Bot is running...'); });
-app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'indexadmin.html')); });
-app.get('/reels', (req, res) => { res.sendFile(path.join(__dirname, 'reels.html')); });
-
-app.get('/api/admin/data', async (req, res) => {
-    try {
-        const today = new Date().toISOString().split('T')[0];
-        const currentMonth = new Date().toISOString().slice(0, 7);
-
-        const adminSnap = await db.ref('admin_settings').once('value');
-        const dailySnap = await db.ref(`daily_stats/${today}`).once('value');
-        const monthlySnap = await db.ref(`monthly_stats/${currentMonth}`).once('value');
-        const totalUsersSnap = await db.ref('all_users').once('value');
-        const downloadsSnap = await db.ref('stats/total_downloads').once('value');
-
-        const settings = adminSnap.val() || {};
-        
-        settings.dailyUsers = dailySnap.numChildren() || 0;
-        settings.monthlyUsers = monthlySnap.numChildren() || 0;
-        settings.totalUsers = totalUsersSnap.numChildren() || 0;
-        settings.totalDownloads = downloadsSnap.val() || 0;
-
-        if (!settings.channels) settings.channels = [];
-        if (!settings.ads) settings.ads = [];
-
-        res.json(settings);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/settings', async (req, res) => {
-    try {
-        const { text, img } = req.body;
-        await db.ref('admin_settings').update({ welcomeText: text, welcomeImage: img });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/add-channel', async (req, res) => {
-    try {
-        const { name, user } = req.body;
-        const snap = await db.ref('admin_settings/channels').once('value');
-        let channels = snap.val() || [];
-        channels.push({ name, user });
-        await db.ref('admin_settings/channels').set(channels);
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/del-channel', async (req, res) => {
-    try {
-        const { index } = req.body;
-        const snap = await db.ref('admin_settings/channels').once('value');
-        let channels = snap.val() || [];
-        channels.splice(index, 1);
-        await db.ref('admin_settings/channels').set(channels);
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/save-ad', async (req, res) => {
-    try {
-        const { index, text, link } = req.body;
-        const snap = await db.ref('admin_settings/ads').once('value');
-        let ads = snap.val() || [];
-
-        if (index !== undefined && index >= 0 && index < ads.length) {
-            ads[index] = { text, link }; 
-        } else {
-            ads.push({ text, link }); 
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+            position: fixed;
+            inset: 0;
         }
 
-        await db.ref('admin_settings/ads').set(ads);
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/del-ad', async (req, res) => {
-    try {
-        const { index } = req.body;
-        const snap = await db.ref('admin_settings/ads').once('value');
-        let ads = snap.val() || [];
-
-        if (index !== undefined && index >= 0 && index < ads.length) {
-            ads.splice(index, 1);
-            await db.ref('admin_settings/ads').set(ads);
-        }
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/broadcast', async (req, res) => {
-    const { type, photoUrl, message, buttonsText } = req.body;
-    
-    try {
-        const inline_keyboard = [];
-        if (buttonsText && buttonsText.trim()) {
-            const lines = buttonsText.split('\n');
-            lines.forEach(line => {
-                const parts = line.split('|');
-                if (parts.length === 2) {
-                    inline_keyboard.push([{
-                        text: parts[0].trim(),
-                        url: parts[1].trim()
-                    }]);
-                }
-            });
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-text-size-adjust: 100%;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        const options = {
-            parse_mode: 'HTML',
-            reply_markup: inline_keyboard.length > 0 ? { inline_keyboard } : undefined
+        /* App Loading Screen */
+        #app-loader {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: #000;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.4s;
+        }
+
+        .tiktok-style-logo {
+            width: 90px;
+            height: 90px;
+            animation: pulseGlow 1.6s infinite ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(0.92); filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.6)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(254, 9, 121, 0.8)); }
+            100% { transform: scale(0.92); filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.6)); }
+        }
+
+        .loader-text {
+            margin-top: 20px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+
+        /* ===================== Slim top bar: own profile only ===================== */
+        /* Fixed, but no solid panel behind it -- just a soft fade for legibility,
+           exactly like the original app's top bar (no reserved screen space). */
+        .top-bar {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 62px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 0 16px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .own-profile-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .own-avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1.5px solid rgba(255,255,255,0.85);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            background: #1b1b1e;
+        }
+
+        .own-name {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+            max-width: 110px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .own-settings-icon {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .own-settings-icon:active {
+            transform: scale(0.88);
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .own-settings-icon svg {
+            width: 13px; height: 13px;
+            fill: #fff;
+        }
+
+        /* High-Performance Container with GPU Acceleration */
+        .reels-container {
+            height: 100%;
+            width: 100%;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: auto;
+            -webkit-overflow-scrolling: touch;
+            transform: translate3d(0, 0, 0);
+            will-change: scroll-position;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .reels-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .reel {
+            position: relative;
+            height: 100%;
+            width: 100%;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            overflow: hidden;
+            will-change: transform;
+        }
+
+        /* Top & Bottom Vignette Overlay for contrast */
+        .vignette-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.92) 100%);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            opacity: 0;
+            transform: scale(1);
+            transform-origin: center center;
+            touch-action: pan-y;
+            transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            image-rendering: -webkit-optimize-contrast;
+            background-color: #000;
+        }
+
+        video.loaded {
+            opacity: 1;
+        }
+
+        /* Play/Pause Central Indicator Overlay */
+        .play-indicator {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.6);
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            width: 72px; height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 8;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .play-indicator.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Overlay Interface Layer */
+        .overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 80px 16px 32px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .video-details {
+            max-width: 68%;
+            color: #fff;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .uploader-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            width: fit-content;
+        }
+
+        .uploader-info img {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            object-fit: cover;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            background: #1b1b1e;
+        }
+
+        .uploader-info h3 {
+            font-size: 14.5px;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 170px;
+        }
+
+        /* Caption / admin-panel ad text */
+        .video-details p {
+            font-size: 13px;
+            opacity: 0.95;
+            line-height: 1.4;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            max-height: 90px;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+
+        .video-details p::-webkit-scrollbar {
+            display: none;
+        }
+
+        .caption-link {
+            color: #3182ce;
+            text-decoration: none;
+            font-weight: 700;
+            pointer-events: auto;
+        }
+
+        /* Actions Panel */
+        .actions-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 13px;
+            align-items: center;
+            pointer-events: auto;
+            margin-bottom: 4px;
+        }
+
+        .action-button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10.5px;
+            font-weight: 600;
+            transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .action-button:active {
+            transform: scale(0.85);
+        }
+
+        .action-icon {
+            width: 39px;
+            height: 39px;
+            background: rgba(255, 255, 255, 0.09);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+        }
+
+        .action-button:hover .action-icon {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .uploader-panel-pic-wrapper {
+            position: relative;
+            width: 46px; height: 46px;
+            margin-bottom: 4px;
+            cursor: pointer;
+        }
+
+        .uploader-panel-pic {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #00f2fe 0%, #fe0979 100%);
+            padding: 2.5px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(254, 9, 121, 0.3);
+            transition: transform 0.2s ease;
+        }
+
+        .uploader-panel-pic:active {
+            transform: scale(0.9);
+        }
+
+        .uploader-panel-pic img {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1.5px solid #000;
+            background: #1b1b1e;
+        }
+
+        .verified-badge {
+            position: absolute;
+            bottom: -1px; right: -1px;
+            width: 15px; height: 15px;
+            background: #1da1f2;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1.5px solid #000;
+            color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .verified-badge svg { width: 9px; height: 9px; }
+
+        .action-button.liked .action-icon {
+            background: #fe0979;
+            border-color: #fe0979;
+            filter: drop-shadow(0 0 8px rgba(254, 9, 121, 0.6));
+        }
+
+        .action-icon svg {
+            width: 18px; height: 18px;
+            fill: currentColor;
+        }
+
+        /* 3D Elastic Heart Pop */
+        .heart-pop {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            color: #fe0979;
+            filter: drop-shadow(0 0 20px rgba(254, 9, 121, 0.9));
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        @keyframes heartPop {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-20deg); opacity: 0; }
+            15% { transform: translate(-50%, -50%) scale(1.3) rotate(10deg); opacity: 0.95; }
+            30% { transform: translate(-50%, -50%) scale(0.9) rotate(-5deg); opacity: 0.95; }
+            45% { transform: translate(-50%, -50%) scale(1.05) rotate(0deg); opacity: 0.95; }
+            80% { transform: translate(-50%, -50%) scale(1.02); opacity: 0.85; }
+            100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+        }
+
+        .pop-active {
+            animation: heartPop 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        .loading {
+            position: absolute;
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 3;
+        }
+
+        /* ===================== Bottom Sheet Popup Styles ===================== */
+        .bottom-sheet {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1000;
+            visibility: hidden;
+            transition: visibility 0.3s;
+        }
+
+        .bottom-sheet.open {
+            visibility: visible;
+        }
+
+        .sheet-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .bottom-sheet.open .sheet-overlay {
+            opacity: 1;
+        }
+
+        .sheet-content {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%;
+            background: rgba(16, 16, 18, 0.92);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-top-left-radius: 26px;
+            border-top-right-radius: 26px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 22px 22px calc(22px + env(safe-area-inset-bottom, 0px)) 22px;
+            color: #fff;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+        }
+
+        .bottom-sheet.open .sheet-content {
+            transform: translateY(0);
+        }
+
+        .sheet-header {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 18px;
+        }
+
+        .sheet-drag-handle {
+            width: 38px; height: 4.5px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+        }
+
+        .profile-popup-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+
+        .profile-popup-info img {
+            width: 78px; height: 78px;
+            border-radius: 50%;
+            border: 2.5px solid #fe0979;
+            object-fit: cover;
+            box-shadow: 0 4px 15px rgba(254, 9, 121, 0.4);
+            background: #1b1b1e;
+        }
+
+        .profile-popup-info h4 {
+            font-size: 16.5px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .settings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 14px 18px;
+            border-radius: 14px;
+            font-size: 13.5px;
+            font-weight: 500;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px; height: 25px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255, 255, 255, 0.1);
+            transition: .25s cubic-bezier(0.25, 1, 0.5, 1);
+            border-radius: 30px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 17px; width: 17px;
+            left: 4px; bottom: 4px;
+            background-color: white;
+            transition: .25s cubic-bezier(0.25, 1, 0.5, 1);
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: #38a169; }
+        input:checked + .slider:before { transform: translateX(19px); }
+
+        /* ===== Professional Uploader Sheet ===== */
+        .uploader-avatar-wrap {
+            position: relative;
+            width: 84px; height: 84px;
+        }
+
+        .uploader-avatar-wrap img {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            border: 2.5px solid rgba(255,255,255,0.15);
+            object-fit: cover;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+            background: #1b1b1e;
+        }
+
+        .verified-badge-lg {
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 22px; height: 22px;
+            background: #1da1f2;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2.5px solid #101012;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        .verified-badge-lg svg { width: 11px; height: 11px; fill: #fff; }
+
+        .inline-verified-badge {
+            width: 16px; height: 16px;
+            background: #1da1f2;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .inline-verified-badge svg { width: 9px; height: 9px; fill: #fff; }
+
+        .open-chat-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            background: linear-gradient(45deg, #00f2fe, #3182ce);
+            color: #fff;
+            font-weight: 700;
+            font-size: 13.5px;
+            border-radius: 14px;
+            padding: 13px;
+            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .open-chat-btn:active { transform: scale(0.97); }
+        .open-chat-btn svg { width: 16px; height: 16px; fill: #fff; }
+
+        .dual-action-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .dual-action-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            cursor: pointer;
+            border-radius: 14px;
+            padding: 13px 8px;
+            font-size: 12.5px;
+            font-weight: 700;
+            transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+        .dual-action-btn:active { transform: scale(0.96); }
+        .dual-action-btn svg { width: 19px; height: 19px; fill: currentColor; }
+
+        .dual-action-btn.save-btn { color: #00f2fe; }
+        .dual-action-btn.save-btn.active {
+            background: rgba(0, 242, 254, 0.14);
+            border-color: rgba(0, 242, 254, 0.35);
+            filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.35));
+        }
+
+        .dual-action-btn.report-btn { color: #fe0979; }
+        .dual-action-btn.report-btn:hover,
+        .dual-action-btn.report-btn:active {
+            background: rgba(254, 9, 121, 0.12);
+            border-color: rgba(254, 9, 121, 0.3);
+        }
+
+        .video-info-block {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 13px 16px;
+            border-radius: 13px;
+            font-size: 13px;
+        }
+
+        .info-label { color: rgba(255,255,255,0.55); font-weight: 500; }
+        .info-value { color: #fff; font-weight: 600; }
+
+        /* Custom Toast Notification */
+        #custom-toast {
+            position: fixed;
+            bottom: 100px; left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(25, 25, 25, 0.9);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 16px;
+            font-size: 13.5px;
+            font-weight: 600;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.35s ease;
+            border: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Animated Loader Screen -->
+    <div id="app-loader">
+        <svg class="tiktok-style-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.589 12.55c-1.8 0-3.45-.69-4.7-1.83V17c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6c.3 0 .59.03.88.08V13.2c-.29-.07-.58-.1-.88-.1-2.15 0-3.9 1.75-3.9 3.9s1.75 3.9 3.9 3.9 3.9-1.75 3.9-3.9v-13h2.12c.38 2.61 2.63 4.65 5.37 4.65V6.45c-1.42 0-2.63-.84-3.2-2.05H14.19v9.12c1.07.65 2.33 1.03 3.69 1.03h1.71v-2h-1.71z" fill="#00f2fe"/>
+            <path d="M19.589 11.55c-1.8 0-3.45-.69-4.7-1.83V16c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6c.3 0 .59.03.88.08V12.2c-.29-.07-.58-.1-.88-.1-2.15 0-3.9 1.75-3.9 3.9s1.75 3.9 3.9 3.9 3.9-1.75 3.9-3.9v-13h2.12c.38 2.61 2.63 4.65 5.37 4.65V5.45c-1.42 0-2.63-.84-3.2-2.05H14.19v9.12c1.07.65 2.33 1.03 3.69 1.03h1.71v-2h-1.71z" fill="#fe0979" style="mix-blend-mode: screen;"/>
+        </svg>
+        <div class="loader-text" id="loaderText">Loading Videos...</div>
+    </div>
+
+    <!-- Slim top bar: own profile chip only (no solid panel) -->
+    <div class="top-bar">
+        <div class="own-profile-chip" onclick="openProfileModal(currentUser.id, currentUser.username, currentUser.photo)">
+            <img class="own-avatar" id="ownAvatarImg" src="" alt="" onerror="handleImgError(this)">
+            <span class="own-name" id="ownNameText"></span>
+            <span class="own-settings-icon" onclick="event.stopPropagation(); openProfileModal(currentUser.id, currentUser.username, currentUser.photo)">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 c-0.12,0.21-0.08,0.47,0.12,0.61l2.03,1.58C4.84,11.36,4.81,11.68,4.81,12c0,0.32,0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                </svg>
+            </span>
+        </div>
+    </div>
+
+    <!-- Container for dynamic reels -->
+    <div class="reels-container" id="reelsContainer"></div>
+
+    <!-- Toast Component -->
+    <div id="custom-toast">
+        <span id="toast-text">Success</span>
+    </div>
+
+    <!-- Own Settings Modal (Viewer) -->
+    <div class="bottom-sheet" id="profileModal">
+        <div class="sheet-overlay" onclick="closeProfileModal()"></div>
+        <div class="sheet-content">
+            <div class="sheet-header">
+                <div class="sheet-drag-handle"></div>
+            </div>
+            <div class="profile-popup-info">
+                <img id="modalProfilePic" src="" alt="Profile" onerror="handleImgError(this)">
+                <h4 id="modalProfileName">Username</h4>
+            </div>
+            <div class="settings-list">
+                <div class="setting-item">
+                    <span id="txt-upload">Start Uploading Reels</span>
+                    <label class="switch">
+                        <input type="checkbox" id="uploadToggle" onchange="updateProfileSetting()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <span id="txt-notify">Notifications</span>
+                    <label class="switch">
+                        <input type="checkbox" id="notificationToggle" onchange="updateProfileSetting()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Uploader Details & Video Info Bottom Sheet (professional layout) -->
+    <div class="bottom-sheet" id="uploaderSheet">
+        <div class="sheet-overlay" onclick="closeUploaderSheet()"></div>
+        <div class="sheet-content">
+            <div class="sheet-header">
+                <div class="sheet-drag-handle"></div>
+            </div>
+
+            <div class="profile-popup-info">
+                <div class="uploader-avatar-wrap">
+                    <img id="upModalPic" src="" alt="Profile" onerror="handleImgError(this)">
+                    <div id="upModalVerified" class="verified-badge-lg" style="display: none;">
+                        <svg viewBox="0 0 24 24"><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20 8l-1.4-1.4z"/></svg>
+                    </div>
+                </div>
+                <h4 id="upModalName">Uploader</h4>
+                <button id="btnOpenTgProfile" class="open-chat-btn">
+                    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+                    <span id="openChatLabel">Open Chat</span>
+                </button>
+            </div>
+
+            <div class="dual-action-row">
+                <button id="btnSaveVideoInSheet" class="dual-action-btn save-btn">
+                    <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+                    <span id="saveVideoLabel">Save Video</span>
+                </button>
+                <button id="btnReportVideoInSheet" class="dual-action-btn report-btn">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z"/></svg>
+                    <span id="reportVideoLabel">Report Video</span>
+                </button>
+            </div>
+
+            <div class="video-info-block">
+                <div class="info-row">
+                    <span class="info-label" id="lbl-size">Video Size</span>
+                    <span id="upModalSize" class="info-value">Unknown Size</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label" id="lbl-date">Upload Date</span>
+                    <span id="upModalDate" class="info-value">Unknown Date</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label" id="lbl-views">Views</span>
+                    <span id="upModalViews" class="info-value">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // Fallback avatar shown whenever a profile photo fails to load
+        // (old videos whose uploaderPic link has expired / broken, etc).
+        const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+            '<circle cx="32" cy="32" r="32" fill="#26262b"/>' +
+            '<circle cx="32" cy="25" r="12" fill="#5c5c66"/>' +
+            '<path d="M8 58c0-14 10.7-24 24-24s24 10 24 24" fill="#5c5c66"/>' +
+            '</svg>'
+        );
+
+        function handleImgError(img) {
+            img.onerror = null;
+            img.src = DEFAULT_AVATAR;
+        }
+
+        // Central place to resolve a profile photo URL.
+        // TODO: wire in the photo-to-link API here once its request/response
+        // format is provided, e.g.:
+        //   return `${PHOTO_LINK_API_BASE}?src=${encodeURIComponent(rawUrl)}`
+        // This keeps the bot token out of any client-side URL and lets the
+        // backend cache/store the resolved photo once instead of re-fetching
+        // it from Telegram on every load.
+        function resolvePhotoUrl(rawUrl) {
+            if (!rawUrl || rawUrl.includes('via.placeholder.com')) return DEFAULT_AVATAR;
+            return rawUrl;
+        }
+
+        const currentUser = {
+            id: tg?.initDataUnsafe?.user?.id || "demo_user_123",
+            username: tg?.initDataUnsafe?.user?.username || "Guest_User",
+            photo: resolvePhotoUrl(tg?.initDataUnsafe?.user?.photo_url)
         };
 
-        const usersSnap = await db.ref('all_users').once('value');
-        const users = usersSnap.val() ? Object.keys(usersSnap.val()) : [];
+        let videos = [];
+        let appLang = "en";
+        let activeIndex = 0;
+        const container = document.getElementById('reelsContainer');
 
-        let successCount = 0;
-        let failCount = 0;
+        // Verified / official accounts
+        function isOfficialAccount(uploaderName, uploaderId) {
+            const n = (uploaderName || '').toLowerCase();
+            return n.includes('reelsuploder') || n.includes('reelsuploader') ||
+                   uploaderId === 'reelsuploder' || uploaderId === '-1002241516027';
+        }
+        function isVerifiedAccount(uploaderName, uploaderId) {
+            const n = (uploaderName || '').toLowerCase().replace('@', '');
+            return isOfficialAccount(uploaderName, uploaderId) || n === 'spy_ofc';
+        }
+        function verifiedBadgeSvg() {
+            return '<svg viewBox="0 0 24 24" fill="#fff"><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20 8l-1.4-1.4z"/></svg>';
+        }
 
-        for (const userId of users) {
+        const uiStrings = {
+            en: {
+                save: "Save Video",
+                saved: "Saved",
+                refresh: "Refresh",
+                report: "Report Video",
+                no_caption: "No caption provided.",
+                loading: "Loading...",
+                upload_reels: "Reels Upload Syncing",
+                notifications: "Notifications",
+                fetching: "Preparing Feed...",
+                share: "Share",
+                openChat: "Open Chat",
+                size: "Video Size",
+                date: "Upload Date",
+                views: "Views"
+            },
+            bn: {
+                save: "ভিডিও সেভ করুন",
+                saved: "সেভ করা হয়েছে",
+                refresh: "রিফ্রেশ",
+                report: "রিপোর্ট করুন",
+                no_caption: "কোনো ক্যাপশন দেওয়া হয়নি।",
+                loading: "লোডিং হচ্ছে...",
+                upload_reels: "রিল আপলোড চালু রাখুন",
+                notifications: "বিজ্ঞপ্তি/নোটিফিকেশন",
+                fetching: "ফিড প্রস্তুত করা হচ্ছে...",
+                share: "শেয়ার",
+                openChat: "চ্যাট খুলুন",
+                size: "ভিডিও সাইজ",
+                date: "আপলোড তারিখ",
+                views: "ভিউ"
+            }
+        };
+
+        function showToast(message) {
+            const toast = document.getElementById('custom-toast');
+            const toastText = document.getElementById('toast-text');
+            toastText.innerHTML = message;
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(-50%) translateY(0)';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(20px)';
+            }, 2500);
+        }
+
+        function applyOwnProfileChip() {
+            document.getElementById('ownAvatarImg').src = currentUser.photo;
+            document.getElementById('ownNameText').innerText = currentUser.username;
+        }
+
+        function applyStaticStrings() {
+            const str = uiStrings[appLang];
+            document.getElementById('txt-upload').innerText = str.upload_reels;
+            document.getElementById('txt-notify').innerText = str.notifications;
+            document.getElementById('openChatLabel').innerText = str.openChat;
+            document.getElementById('reportVideoLabel').innerText = str.report;
+            document.getElementById('lbl-size').innerText = str.size;
+            document.getElementById('lbl-date').innerText = str.date;
+            document.getElementById('lbl-views').innerText = str.views;
+        }
+
+        async function fetchLanguageAndVideos() {
             try {
-                if (type === 'photo' && photoUrl) {
-                    await bot.sendPhoto(userId, photoUrl, { ...options, caption: message });
-                } else {
-                    await bot.sendMessage(userId, message, options);
-                }
-                successCount++;
-            } catch (e) {
-                failCount++;
-            }
-            await new Promise(resolve => setTimeout(resolve, 40)); 
-        }
-
-        res.json({ success: true, successCount, failCount });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/user/lang', async (req, res) => {
-    const { userId } = req.query;
-    if (!userId) return res.status(400).json({ error: "Missing userId" });
-    try {
-        const lang = await getUserLang(userId);
-        res.json({ lang });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.post('/api/videos', async (req, res) => {
-    try {
-        const { seenVideos } = req.body;
-        const snap = await db.ref('mini_app_videos').once('value');
-        const data = snap.val() || {};
-
-        const adminSnap = await db.ref('admin_settings').once('value');
-        const settings = adminSnap.val() || {};
-        const ads = settings.ads || [];
-        
-        let videoList = Object.keys(data).map(key => {
-            let video = { id: key, ...data[key] };
-
-            if (ads.length > 0) {
-                const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                video.caption = `<a href="${randomAd.link}" target="_blank" class="caption-link"><b>${randomAd.text}</b></a>`;
-            } else {
-                video.caption = `<a href="https://t.me/SnapSavingBot" target="_blank" class="caption-link"><b>Visit @SnapSavingBot for more videos!</b></a>`;
-            }
-
-            const sizeMB = video.fileSize ? `${(video.fileSize / (1024 * 1024)).toFixed(2)} MB` : "Unknown Size";
-            const uploadDate = video.timestamp ? new Date(video.timestamp).toLocaleDateString('en-US', { timeZone: 'Asia/Dhaka' }) : "Unknown Date";
-            
-            video.formattedSize = sizeMB;
-            video.formattedDate = uploadDate;
-
-            return video;
-        });
-
-        let wasReset = false;
-        const seenSet = new Set(seenVideos || []);
-        let filteredList = videoList.filter(video => !seenSet.has(video.id));
-
-        if (filteredList.length === 0 && videoList.length > 0) {
-            filteredList = videoList;
-            wasReset = true;
-        }
-
-        res.json({
-            videos: filteredList,
-            wasReset
-        });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.get('/api/videos', async (req, res) => {
-    try {
-        const snap = await db.ref('mini_app_videos').once('value');
-        const data = snap.val() || {};
-
-        const adminSnap = await db.ref('admin_settings').once('value');
-        const settings = adminSnap.val() || {};
-        const ads = settings.ads || [];
-        
-        let videoList = Object.keys(data).map(key => {
-            let video = { id: key, ...data[key] };
-
-            if (ads.length > 0) {
-                const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                video.caption = `<a href="${randomAd.link}" target="_blank" class="caption-link"><b>${randomAd.text}</b></a>`;
-            } else {
-                video.caption = `<a href="https://t.me/SnapSavingBot" target="_blank" class="caption-link"><b>Visit @SnapSavingBot for more videos!</b></a>`;
-            }
-
-            const sizeMB = video.fileSize ? `${(video.fileSize / (1024 * 1024)).toFixed(2)} MB` : "Unknown Size";
-            const uploadDate = video.timestamp ? new Date(video.timestamp).toLocaleDateString('en-US', { timeZone: 'Asia/Dhaka' }) : "Unknown Date";
-            
-            video.formattedSize = sizeMB;
-            video.formattedDate = uploadDate;
-
-            return video;
-        });
-        
-        res.json(videoList);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.get('/api/video/stream/:fileId', async (req, res) => {
-    try {
-        const { fileId } = req.params;
-        const file = await bot.getFile(fileId);
-        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-
-        const headers = {};
-        if (req.headers.range) {
-            headers.Range = req.headers.range;
-        }
-
-        const response = await axios({
-            method: 'get',
-            url: fileUrl,
-            responseType: 'stream',
-            headers: headers
-        });
-
-        res.writeHead(response.status, response.headers);
-        response.data.pipe(res);
-    } catch (err) {
-        res.status(500).send("Error streaming video.");
-    }
-});
-
-app.post('/api/video/like', async (req, res) => {
-    const { videoId, isLiked, userId, username } = req.body;
-    if (!videoId) return res.status(400).json({ error: "Missing videoId" });
-
-    try {
-        const videoRef = db.ref(`mini_app_videos/${videoId}`);
-        const videoSnap = await videoRef.once('value');
-        const video = videoSnap.val();
-
-        if (!video) return res.status(404).json({ error: "Video not found" });
-
-        await videoRef.child('likes').transaction((currentLikes) => {
-            if (isLiked) {
-                return (currentLikes || 0) + 1;
-            } else {
-                return Math.max(0, (currentLikes || 1) - 1);
-            }
-        });
-
-        if (isLiked && video.uploaderId && video.uploaderId !== userId) {
-            await sendDynamicNotification(video.uploaderId, videoId, 'like', { id: userId });
-        }
-
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.post('/api/video/view', async (req, res) => {
-    const { videoId, userId } = req.body;
-    if (!videoId) return res.status(400).json({ error: "Missing videoId" });
-
-    try {
-        const videoRef = db.ref(`mini_app_videos/${videoId}`);
-        const videoSnap = await videoRef.once('value');
-        const video = videoSnap.val();
-
-        if (!video) return res.status(404).json({ error: "Video not found" });
-
-        await videoRef.child('views').transaction((currentViews) => (currentViews || 0) + 1);
-
-        if (video.uploaderId && video.uploaderId !== userId) {
-            await sendDynamicNotification(video.uploaderId, videoId, 'view', { id: userId });
-        }
-
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// Mini-App থেকে সেভ বাটনে ক্লিক করলে রিকোয়েস্টে পাঠানো কাস্টম সেভ সাকসেস ক্যাপশন
-app.post('/api/video/save', async (req, res) => {
-    const { videoId, userId, isSaved } = req.body;
-    if (!videoId || !userId) return res.status(400).json({ error: "Missing parameters" });
-
-    try {
-        const videoSnap = await db.ref(`mini_app_videos/${videoId}`).once('value');
-        const video = videoSnap.val();
-
-        if (!video) return res.status(404).json({ error: "Video not found" });
-
-        if (isSaved) {
-            // ইউজারের ভাষা ডাটাবেজ থেকে খুঁজে নিয়ে সেই ভাষার ক্যাপশন সেট করা হচ্ছে
-            const userLang = await getUserLang(userId);
-            const str = strings[userLang];
-
-            await bot.sendVideo(userId, video.fileId, {
-                caption: str.save_success_caption,
-                parse_mode: 'HTML'
-            });
-
-            if (video.uploaderId && video.uploaderId !== userId) {
-                await sendDynamicNotification(video.uploaderId, videoId, 'save', { id: userId });
-            }
-        }
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.post('/api/video/report', async (req, res) => {
-    const { videoId, userId, username } = req.body;
-    if (!videoId) return res.status(400).json({ error: "Missing parameters" });
-
-    try {
-        const videoSnap = await db.ref(`mini_app_videos/${videoId}`).once('value');
-        const video = videoSnap.val();
-
-        if (!video) return res.status(404).json({ error: "Video not found" });
-
-        const reporterName = username ? `@${username}` : "Unknown User";
-        const adminMsg = `⚠️ <b>Video Report Alert!</b>\n\n👤 <b>Reporter:</b> ${reporterName} (ID: ${userId})\n🆔 <b>Reel ID:</b> ${videoId}`;
-
-        await bot.sendMessage(ADMIN_ID, adminMsg, {
-            parse_mode: 'HTML',
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: "❌ Remove Video from Server", callback_data: `remove_vid_${videoId}` }
-                    ]
-                ]
-            }
-        });
-
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.get('/api/user/settings', async (req, res) => {
-    const { userId } = req.query;
-    if (!userId) return res.status(400).json({ error: "Missing userId" });
-
-    try {
-        const snap = await db.ref(`users/${userId}/settings`).once('value');
-        const settings = snap.val() || { uploadingReels: true, notifications: true };
-        res.json(settings);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.post('/api/user/settings', async (req, res) => {
-    const { userId, uploadingReels, notifications } = req.body;
-    if (!userId) return res.status(400).json({ error: "Missing userId" });
-
-    try {
-        await db.ref(`users/${userId}/settings`).set({
-            uploadingReels: uploadingReels !== false,
-            notifications: notifications !== false
-        });
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-async function getUserLang(chatId) {
-    const snap = await db.ref(`users/${chatId}/lang`).once('value');
-    return snap.val() || 'en'; 
-}
-
-async function trackUser(chatId) {
-    const today = new Date().toISOString().split('T')[0];
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    
-    await db.ref(`all_users/${chatId}`).set(true);
-    await db.ref(`daily_stats/${today}/${chatId}`).set(true);
-    await db.ref(`monthly_stats/${currentMonth}/${chatId}`).set(true);
-}
-
-async function getMissingChannels(userId) {
-    try {
-        const snap = await db.ref('admin_settings/channels').once('value');
-        const allChannels = snap.val() || [];
-        if (allChannels.length === 0) return [];
-        let missing = [];
-        for (const ch of allChannels) {
-            try {
-                let username = ch.user.includes('t.me/') ? `@${ch.user.split('/').pop()}` : ch.user;
-                const res = await bot.getChatMember(username, userId);
-                if (['left', 'kicked', 'restricted'].includes(res.status)) missing.push(ch);
-            } catch (e) { missing.push(ch); }
-        }
-        return missing;
-    } catch (e) { return []; }
-}
-
-bot.on('channel_post', async (msg) => {
-    const targetChannel = TARGET_CHANNEL;
-
-    if (msg.chat && msg.chat.username && msg.chat.username.toLowerCase() === targetChannel.toLowerCase()) {
-        if (msg.video) {
-            try {
-                const messageId = msg.message_id;
-                const dbRef = db.ref(`mini_app_videos/${messageId}`);
-                const snap = await dbRef.once('value');
-                if (!snap.exists()) {
-                    const video = msg.video;
-                    const fileId = video.file_id;
-                    const fileSize = video.file_size || 0;
-                    const caption = msg.caption || "";
-
-                    let uploaderId = msg.chat.id.toString();
-                    let uploaderName = `@${msg.chat.username}` || msg.chat.title || "Reels Uploader";
-                    let uploaderPic = "https://via.placeholder.com/150";
-
-                    await dbRef.set({
-                        fileId: fileId,
-                        fileSize: fileSize,
-                        caption: "",
-                        likes: 0,
-                        views: 0,
-                        uploaderId: uploaderId,
-                        uploaderName: uploaderName,
-                        uploaderPic: uploaderPic,
-                        timestamp: admin.database.ServerValue.TIMESTAMP
-                    });
-                }
+                const res = await fetch(`/api/user/lang?userId=${currentUser.id}`);
+                const data = await res.json();
+                appLang = data.lang || "en";
             } catch (err) {
-                console.error("Secondary channel post sync error:", err.message);
+                console.error("Lang fetch failed", err);
+            }
+            document.getElementById('loaderText').innerText = uiStrings[appLang].fetching;
+            applyOwnProfileChip();
+            applyStaticStrings();
+            fetchVideos();
+        }
+
+        // Caption text (bold / links) coming from the Admin Panel -- this
+        // IS the "ad" placement; no separate ad banner is rendered.
+        function formatCaption(text) {
+            if (!text) return "";
+            if (text.includes('<a') || text.includes('<strong') || text.includes('<b>')) {
+                return text;
+            }
+
+            let safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            safeText = safeText.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" class="caption-link" onclick="event.stopPropagation();">${url}</a>`;
+            });
+
+            const mentionRegex = /@([a-zA-Z0-9_]{5,32})/g;
+            safeText = safeText.replace(mentionRegex, function(mention, username) {
+                return `<a href="https://t.me/${username}" target="_blank" class="caption-link" onclick="event.stopPropagation();">${mention}</a>`;
+            });
+
+            safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            safeText = safeText.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+
+            return safeText;
+        }
+
+        async function fetchVideos() {
+            try {
+                let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
+                const response = await fetch('/api/videos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: currentUser.id, seenVideos: seenVideos })
+                });
+
+                const data = await response.json();
+                if (data.wasReset) {
+                    localStorage.setItem('seen_videos', '[]');
+                }
+
+                videos = data.videos || [];
+
+                videos.sort((a, b) => {
+                    const dateA = a.timestamp ? new Date(a.timestamp) : parseInt(a.id) || 0;
+                    const dateB = b.timestamp ? new Date(b.timestamp) : parseInt(b.id) || 0;
+                    return dateB - dateA;
+                });
+
+                const startParam = tg?.initDataUnsafe?.start_param;
+                if (startParam) {
+                    const matchedIndex = videos.findIndex(v => String(v.id) === String(startParam));
+                    if (matchedIndex !== -1) {
+                        const matchedVideo = videos.splice(matchedIndex, 1)[0];
+                        videos.unshift(matchedVideo);
+                    }
+                }
+
+                renderVideos();
+            } catch (err) {
+                console.error("Failed to load videos", err);
+                hideLoader();
             }
         }
-    }
-});
 
-bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-    if (!text) return;
-
-    await trackUser(chatId).catch(() => {});
-
-    if (text === "🇧🇩 বাংলা / 🇬🇧 English") {
-        const currentLang = await getUserLang(chatId);
-        const newLang = currentLang === 'bn' ? 'en' : 'bn';
-        await db.ref(`users/${chatId}/lang`).set(newLang);
-        const str = strings[newLang];
-        return bot.sendMessage(chatId, str.lang_switched, chatBoxConfig);
-    }
-
-    if (text === '/start') {
-        try {
-            const lang = await getUserLang(chatId);
-            const str = strings[lang];
-
-            const snap = await db.ref('admin_settings').once('value');
-            const data = snap.val() || {};
-            const welcomeMsg = data.welcomeText || str.welcome;
-            const welcomeImg = data.welcomeImage || "https://telegra.ph/file/default.jpg";
-
-            const inlineKeyboard = [
-                [{ text: str.watch_btn, url: "https://t.me/SnapSavingBot/reels" }],
-                [{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]
-            ];
-
-            try {
-                await bot.sendPhoto(chatId, welcomeImg, {
-                    caption: welcomeMsg,
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
-            } catch (imgErr) {
-                await bot.sendMessage(chatId, welcomeMsg, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
+        function renderVideos() {
+            if (videos.length === 0) {
+                container.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%;">No videos available.</div>`;
+                hideLoader();
+                return;
             }
 
-            const helperText = lang === 'bn'
-                ? "👇 নিচের বাটন থেকে আপনার ভাষা পরিবর্তন করতে পারেন অথবা যেকোনো ভিডিও লিংক পাঠান।"
-                : "👇 You can change your language using the button below or send any video link to download.";
-            
-            await bot.sendMessage(chatId, helperText, chatBoxConfig);
+            const str = uiStrings[appLang];
 
-        } catch (e) { console.error("Start command processing error:", e); }
-    }
+            container.innerHTML = videos.map((video, index) => {
+                const streamUrl = `/api/video/stream/${encodeURIComponent(video.fileId)}`;
+                const isLiked = localStorage.getItem(`liked_${video.id}`) === 'true';
+                const uploaderName = video.uploaderName || "@reelsuploder";
+                const uploaderPic = resolvePhotoUrl(video.uploaderPic);
 
-    if (text === '/settings') {
-        const lang = await getUserLang(chatId);
-        const str = strings[lang];
-        const keyboard = await getSettingsKeyboard(chatId);
-        return bot.sendMessage(chatId, str.settings_title, {
-            parse_mode: 'HTML',
-            reply_markup: keyboard
-        });
-    }
+                const verified = isVerifiedAccount(uploaderName, video.uploaderId);
+                const badgeInline = verified ? `<span class="inline-verified-badge">${verifiedBadgeSvg()}</span>` : '';
+                const badgeCorner = verified ? `<div class="verified-badge">${verifiedBadgeSvg()}</div>` : '';
 
-    if (text.startsWith('http')) {
-        const lang = await getUserLang(chatId);
-        const str = strings[lang];
+                return `
+                    <div class="reel" id="reel-${video.id}" data-index="${index}">
+                        <div class="vignette-overlay"></div>
+                        <div class="loading">${str.loading}</div>
 
-        const missingChannels = await getMissingChannels(chatId);
-        if (missingChannels.length > 0) {
-            userSessions[chatId] = text;
-            
-            const buttons = [];
-            for (let i = 0; i < missingChannels.length; i += 2) {
-                const row = missingChannels.slice(i, i + 2).map(c => ({
-                    text: `📢 ${c.name}`,
-                    url: c.user.startsWith('http') ? c.user : `https://t.me/${c.user.replace('@','')}`
-                }));
-                buttons.push(row);
+                        <div class="play-indicator">
+                            <svg viewBox="0 0 24 24" width="36" height="36" fill="#fff">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                        </div>
+
+                        <video data-src="${streamUrl}" loop playsinline webkit-playsinline preload="none" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
+
+                        <div class="heart-pop" id="heart-pop-${video.id}">
+                            <svg viewBox="0 0 24 24" width="90" height="90" fill="currentColor">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                        </div>
+
+                        <div class="overlay">
+                            <!-- Left Info Panel: dynamic uploader info + admin-panel caption/ad text -->
+                            <div class="video-details">
+                                <div class="uploader-info" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
+                                    <img src="${uploaderPic}" alt="${uploaderName}" onerror="handleImgError(this)">
+                                    <h3>${uploaderName}</h3>
+                                    ${badgeInline}
+                                </div>
+                                <p>${formatCaption(video.caption) || str.no_caption}</p>
+                            </div>
+
+                            <div class="actions-panel">
+                                <!-- Uploader profile picture (opens uploader popup) -->
+                                <div class="uploader-panel-pic-wrapper" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
+                                    <div class="uploader-panel-pic">
+                                        <img src="${uploaderPic}" alt="${uploaderName}" onerror="handleImgError(this)">
+                                    </div>
+                                    ${badgeCorner}
+                                </div>
+
+                                <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
+                                    <div class="action-icon">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                        </svg>
+                                    </div>
+                                    <span id="like-count-${video.id}">${video.likes || 0}</span>
+                                </button>
+
+                                <button class="action-button" onclick="shareVideo('${video.id}', event)">
+                                    <div class="action-icon" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe; border-color: rgba(0, 242, 254, 0.25);">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                                        </svg>
+                                    </div>
+                                    <span style="color: #00f2fe;">${str.share}</span>
+                                </button>
+
+                                <button class="action-button" onclick="refreshFeed(event)">
+                                    <div class="action-icon">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/>
+                                        </svg>
+                                    </div>
+                                    <span>${str.refresh}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            updateVideoSources(0);
+            setupIntersectionObserver();
+            setupDoubleTap();
+            setupPinchZoom();
+        }
+
+        // Optimized Autoplay sound workaround on user touch
+        function forceUnmuteActiveVideo() {
+            const currentVideo = document.querySelector(`.reel[data-index="${activeIndex}"] video`);
+            if (currentVideo && currentVideo.muted) {
+                currentVideo.muted = false;
             }
-            buttons.push([{ text: str.verify, callback_data: "verify_join" }]);
+        }
+        document.addEventListener('touchstart', forceUnmuteActiveVideo, { once: true });
+        document.addEventListener('click', forceUnmuteActiveVideo, { once: true });
 
-            return bot.sendMessage(chatId, `⚠️ **${str.must_join}**`, {
-                parse_mode: 'Markdown',
-                reply_markup: { inline_keyboard: buttons }
+        function updateVideoSources(currentIndex) {
+            const reels = document.querySelectorAll('.reel');
+            reels.forEach((reel, i) => {
+                const video = reel.querySelector('video');
+                if (!video) return;
+                const realSrc = video.getAttribute('data-src');
+
+                if (i >= currentIndex - 1 && i <= currentIndex + 1) {
+                    if (!video.src || video.src === "" || !video.src.includes(realSrc)) {
+                        video.src = realSrc;
+                        video.load();
+                    }
+                } else {
+                    if (video.src && video.src !== "") {
+                        video.pause();
+                        video.removeAttribute('src');
+                        video.load();
+                        video.classList.remove('loaded');
+                        video.style.transform = 'scale(1)';
+                        video.dataset.scale = 1;
+                        const loadingText = reel.querySelector('.loading');
+                        if (loadingText) loadingText.style.display = 'block';
+                    }
+                }
             });
         }
-        processDownload(chatId, text, msg.message_id, msg);
-    }
-});
 
-bot.on('callback_query', async (q) => {
-    const chatId = q.message.chat.id;
-    const callbackData = q.data;
-    const lang = await getUserLang(chatId);
-    const str = strings[lang];
+        function videoLoaded(videoElement) {
+            videoElement.classList.add('loaded');
+            const loadingText = videoElement.parentElement.querySelector('.loading');
+            if (loadingText) loadingText.style.display = 'none';
 
-    if (callbackData === "setlang_bn" || callbackData === "setlang_en") {
-        const newLang = callbackData === "setlang_bn" ? 'bn' : 'en';
-        await db.ref(`users/${chatId}/lang`).set(newLang);
-        const updatedStr = strings[newLang];
-        
-        if (q.message.text && q.message.text.includes(strings[lang].settings_title)) {
-            const keyboard = await getSettingsKeyboard(chatId);
-            await bot.editMessageText(updatedStr.settings_title, {
-                chat_id: chatId,
-                message_id: q.message.message_id,
-                parse_mode: 'HTML',
-                reply_markup: keyboard
-            }).catch(() => {});
-        } else {
-            if (q.message.reply_markup && q.message.reply_markup.inline_keyboard) {
-                const oldKeyboard = q.message.reply_markup.inline_keyboard;
-                const newKeyboard = oldKeyboard.map(row => {
-                    return row.map(btn => {
-                        if (btn.callback_data === 'setlang_bn' || btn.callback_data === 'setlang_en') {
-                            return {
-                                text: updatedStr.lang_btn,
-                                callback_data: newLang === 'en' ? 'setlang_bn' : 'setlang_en'
-                            };
-                        }
-                        if (btn.text === strings[lang].watch_btn) {
-                            return { ...btn, text: updatedStr.watch_btn };
-                        }
-                        if (btn.text === strings[lang].play_online) {
-                            return { ...btn, text: updatedStr.play_online };
-                        }
-                        if (btn.text === strings[lang].get_music) {
-                            return { ...btn, text: updatedStr.get_music };
-                        }
-                        if (btn.text === strings[lang].wrong_video) {
-                            return { ...btn, text: updatedStr.wrong_video };
-                        }
-                        return btn;
-                    });
+            const reelParent = videoElement.closest('.reel');
+            if (reelParent && parseInt(reelParent.getAttribute('data-index')) === activeIndex) {
+                hideLoader();
+                // Ensure instant smooth autoplay with sound fallback
+                videoElement.muted = false;
+                videoElement.play().catch(() => {
+                    videoElement.muted = true;
+                    videoElement.play().catch(() => {});
                 });
-                
-                await bot.editMessageReplyMarkup({ inline_keyboard: newKeyboard }, {
-                    chat_id: chatId,
-                    message_id: q.message.message_id
+            }
+        }
+
+        function hideLoader() {
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => { loader.style.visibility = 'hidden'; }, 400);
+            }
+        }
+
+        function togglePlay(video) {
+            video.muted = false; // Unmute on explicit user interaction
+            const playIndicator = video.parentElement.querySelector('.play-indicator');
+            if (video.paused) {
+                video.play().then(() => {
+                    if (playIndicator) playIndicator.classList.remove('show');
                 }).catch(() => {});
+            } else {
+                video.pause();
+                if (playIndicator) {
+                    playIndicator.classList.add('show');
+                }
             }
         }
 
-        await bot.answerCallbackQuery(q.id, { text: updatedStr.lang_switched });
-        await bot.sendMessage(chatId, updatedStr.lang_switched, chatBoxConfig);
-        return;
-    }
+        async function toggleLike(videoId, event) {
+            if (event) event.stopPropagation();
+            const likeBtn = document.querySelector(`#reel-${videoId} .action-button`);
+            const likeCountSpan = document.getElementById(`like-count-${videoId}`);
+            const isLiked = likeBtn.classList.contains('liked');
+            let currentLikes = parseInt(likeCountSpan.innerText);
 
-    if (callbackData === "toggle_notify") {
-        const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
-        const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
-        const newNotify = settings.notifications === false;
+            const newLikedState = !isLiked;
+            if (newLikedState) {
+                likeBtn.classList.add('liked');
+                likeCountSpan.innerText = currentLikes + 1;
+                localStorage.setItem(`liked_${videoId}`, 'true');
+            } else {
+                likeBtn.classList.remove('liked');
+                likeCountSpan.innerText = Math.max(0, currentLikes - 1);
+                localStorage.removeItem(`liked_${videoId}`);
+            }
 
-        await db.ref(`users/${chatId}/settings`).update({ notifications: newNotify });
-        const keyboard = await getSettingsKeyboard(chatId);
-        
-        await bot.editMessageReplyMarkup(keyboard, {
-            chat_id: chatId,
-            message_id: q.message.message_id
-        }).catch(() => {});
-
-        await bot.answerCallbackQuery(q.id, { text: "Notifications updated!" });
-        return;
-    }
-
-    if (callbackData === "toggle_upload") {
-        const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
-        const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
-        const newUpload = settings.uploadingReels === false;
-
-        await db.ref(`users/${chatId}/settings`).update({ uploadingReels: newUpload });
-        const keyboard = await getSettingsKeyboard(chatId);
-        
-        await bot.editMessageReplyMarkup(keyboard, {
-            chat_id: chatId,
-            message_id: q.message.message_id
-        }).catch(() => {});
-
-        await bot.answerCallbackQuery(q.id, { text: "Reels Upload settings updated!" });
-        return;
-    }
-
-    if (callbackData.startsWith("remove_vid_")) {
-        if (q.from.id.toString() !== ADMIN_ID) {
-            return bot.answerCallbackQuery(q.id, { text: "❌ Unauthorized!", show_alert: true });
-        }
-        
-        const messageId = callbackData.replace("remove_vid_", "");
-        try {
-            await db.ref(`mini_app_videos/${messageId}`).remove();
-            await bot.deleteMessage(`@${TARGET_CHANNEL}`, parseInt(messageId)).catch(() => {});
-            
-            await bot.editMessageText(`✅ <b>ভিডিওটি অ্যাপ এবং সার্ভার থেকে রিমুভ করা হয়েছে!</b>`, {
-                chat_id: q.message.chat.id,
-                message_id: q.message.message_id,
-                parse_mode: 'HTML'
-            });
-            
-            await bot.answerCallbackQuery(q.id, { text: "Removed successfully from app!" });
-        } catch (err) {
-            await bot.answerCallbackQuery(q.id, { text: "Error deleting video.", show_alert: true });
-        }
-        return;
-    }
-
-    if (callbackData.startsWith("wrong_video_")) {
-        const messageId = callbackData.replace("wrong_video_", "");
-        try {
-            await db.ref(`mini_app_videos/${messageId}`).remove();
-            await bot.deleteMessage(`@${TARGET_CHANNEL}`, parseInt(messageId)).catch(() => {});
-            await bot.deleteMessage(chatId, q.message.message_id).catch(() => {});
-            
-            await bot.sendMessage(chatId, str.wrong_video_deleted, chatBoxConfig);
-            await bot.answerCallbackQuery(q.id, { text: "Removed successfully!" });
-        } catch (err) {
-            await bot.answerCallbackQuery(q.id, { text: "Error deleting video.", show_alert: true });
-        }
-        return;
-    }
-
-    if (callbackData === "verify_join") {
-        const missingChannels = await getMissingChannels(chatId);
-        if (missingChannels.length === 0) {
-            await bot.deleteMessage(chatId, q.message.message_id).catch(() => {});
-            const link = userSessions[chatId];
-            if (link) processDownload(chatId, link, null, q.message);
-        } else {
-            bot.answerCallbackQuery(q.id, { text: str.not_joined, show_alert: true });
-        }
-    }
-    
-    if (callbackData === "send_audio") {
-        const audioUrl = audioCache[chatId];
-        if (audioUrl) {
-            bot.answerCallbackQuery(q.id, { text: str.sending_audio });
-            bot.sendAudio(chatId, audioUrl, { caption: "Use This - @SnapSavingBot" });
-        }
-    }
-});
-
-function getProgressBar(percent) {
-    const totalBars = 10;
-    const filledBars = Math.round((percent / 100) * totalBars);
-    const emptyBars = totalBars - filledBars;
-    return "■".repeat(filledBars) + "□".repeat(emptyBars);
-}
-
-async function processDownload(chatId, url, msgId, rawMsg) {
-    const lang = await getUserLang(chatId);
-    const str = strings[lang];
-
-    if (msgId) {
-        try {
-            await bot._request('setMessageReaction', {
-                chat_id: chatId,
-                message_id: msgId,
-                reaction: JSON.stringify([{ type: 'emoji', emoji: '👀' }])
-            });
-        } catch (e) {}
-    }
-
-    const loadingMsg = await bot.sendMessage(chatId, "⏳", chatBoxConfig);
-    let progress = 0;
-    let isDownloaded = false;
-
-    const interval = setInterval(async () => {
-        if (progress < 95 && !isDownloaded) {
-            progress += Math.floor(Math.random() * 10) + 5;
-            if (progress > 95) progress = 95;
-            const bar = getProgressBar(progress);
-            await bot.editMessageText(`⏳ Loading... [${bar}] ${progress}%`, {
-                chat_id: chatId,
-                message_id: loadingMsg.message_id
-            }).catch(() => {});
-        }
-    }, 800);
-
-    try {
-        const res = await axios.get(`https://r-gengpt-api.vercel.app/api/video/download?url=${encodeURIComponent(url)}`);
-        const data = res.data.data;
-
-        if (data && data.medias) {
-            isDownloaded = true;
-            clearInterval(interval);
-
-            await bot.editMessageText(`🪄 Success [${getProgressBar(100)}] 100%`, {
-                chat_id: chatId,
-                message_id: loadingMsg.message_id
-            }).catch(() => {});
-
-            await db.ref('stats/total_downloads').transaction((current) => (current || 0) + 1);
-
-            const video = data.medias.find(m => m.type === 'video') || data.medias[0];
-            const audio = data.medias.find(m => m.type === 'audio');
-            if (audio) audioCache[chatId] = audio.url;
-
-            let adTextCaption = "";
             try {
-                const adminSnap = await db.ref('admin_settings').once('value');
-                const settings = adminSnap.val() || {};
-                const ads = settings.ads || [];
-                if (ads.length > 0) {
-                    const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                    adTextCaption = `\n\nAds <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
+                await fetch('/api/video/like', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ videoId, isLiked: newLikedState, userId: currentUser.id, username: currentUser.username })
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        // Save lives inside the uploader/video-info popup
+        function refreshSaveButtonUI(videoId) {
+            const str = uiStrings[appLang];
+            const isSaved = localStorage.getItem(`saved_${videoId}`) === 'true';
+            const saveBtn = document.getElementById('btnSaveVideoInSheet');
+            const saveLabel = document.getElementById('saveVideoLabel');
+            if (!saveBtn) return;
+            saveBtn.classList.toggle('active', isSaved);
+            saveLabel.innerText = isSaved ? str.saved : str.save;
+        }
+
+        async function toggleSave(videoId) {
+            const isSaved = localStorage.getItem(`saved_${videoId}`) === 'true';
+            const newSavedState = !isSaved;
+
+            if (newSavedState) {
+                localStorage.setItem(`saved_${videoId}`, 'true');
+            } else {
+                localStorage.removeItem(`saved_${videoId}`);
+            }
+
+            refreshSaveButtonUI(videoId);
+            showToast(newSavedState ? "Video saved" : "Removed from saved");
+
+            try {
+                await fetch('/api/video/save', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ videoId, userId: currentUser.id, isSaved: newSavedState })
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        function shareVideo(videoId, event) {
+            if (event) event.stopPropagation();
+
+            const shareUrl = `https://t.me/SnapSavingBot/reels?startapp=${videoId}`;
+
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showToast("Link copied. Opening Telegram...");
+                setTimeout(() => {
+                    const tgText = encodeURIComponent("Check out this Reel!");
+                    const tgShareLink = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${tgText}`;
+                    if (tg) {
+                        tg.openTelegramLink(tgShareLink);
+                    } else {
+                        window.open(tgShareLink, '_blank');
+                    }
+                }, 800);
+            }).catch(() => {
+                const tgText = encodeURIComponent("Check out this Reel!");
+                const tgShareLink = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${tgText}`;
+                if (tg) {
+                    tg.openTelegramLink(tgShareLink);
+                } else {
+                    window.open(tgShareLink, '_blank');
                 }
-            } catch (adErr) {}
+            });
+        }
 
-            let messageId = null;
-            let finalAppLink = `https://t.me/SnapSavingBot/reels`;
+        function handleUploaderClick(uploaderId, uploaderName, uploaderPic, size, date, views, videoId) {
+            const official = isOfficialAccount(uploaderName, uploaderId);
+            const verified = isVerifiedAccount(uploaderName, uploaderId);
 
-            const userSettingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
-            const userSettings = userSettingsSnap.val() || {};
-            const uploadingReels = userSettings.uploadingReels !== false;
+            // Open bottom-sheet details popup
+            document.getElementById('upModalPic').src = uploaderPic;
+            document.getElementById('upModalName').innerText = uploaderName;
+            document.getElementById('upModalSize').innerText = size || "Unknown Size";
+            document.getElementById('upModalDate').innerText = date || "Unknown Date";
+            document.getElementById('upModalViews').innerText = views || "0";
 
-            if (uploadingReels) {
-                try {
-                    const profile = await getUserProfileInfo(chatId);
-                    const uploaderUsername = rawMsg.from && rawMsg.from.username ? `@${rawMsg.from.username}` : (rawMsg.from && rawMsg.from.first_name || "Guest_User");
-                    const uploadDateStr = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Dhaka' });
+            document.getElementById('upModalVerified').style.display = verified ? 'flex' : 'none';
 
-                    const channelPost = await bot.sendVideo(`@${TARGET_CHANNEL}`, video.url, {
-                        caption: `Uploading Reels...`
-                    });
-                    messageId = channelPost.message_id;
-                    finalAppLink = `https://t.me/SnapSavingBot/reels?startapp=${messageId}`;
-
-                    const videoSizeMB = channelPost.video && channelPost.video.file_size 
-                        ? `${(channelPost.video.file_size / (1024 * 1024)).toFixed(2)} MB` 
-                        : "Unknown Size";
-
-                    const channelCaption = `Video link : ${finalAppLink}\n` +
-                                           `Video Size : ${videoSizeMB}\n` +
-                                           `Uploder : ${uploaderUsername}\n` +
-                                           `Upload date : ${uploadDateStr}`;
-
-                    await bot.editMessageCaption(channelCaption, {
-                        chat_id: `@${TARGET_CHANNEL}`,
-                        message_id: messageId
-                    });
-
-                    await db.ref(`mini_app_videos/${messageId}`).set({
-                        fileId: channelPost.video.file_id,
-                        fileSize: channelPost.video.file_size || 0,
-                        caption: "", 
-                        likes: 0,
-                        views: 0,
-                        uploaderId: chatId.toString(),
-                        uploaderName: uploaderUsername,
-                        uploaderPic: profile.photoUrl,
-                        timestamp: admin.database.ServerValue.TIMESTAMP
-                    });
-
-                    const adminMsg = `⚠️ <b>নতুন ভিডিও আপলোড হয়েছে!</b>\n\n` +
-                                     `🔗 <b>Video link :</b> ${finalAppLink}\n` +
-                                     `📦 <b>Video size :</b> ${videoSizeMB}\n` +
-                                     `📅 <b>Upload date :</b> ${uploadDateStr}`;
-
-                    await bot.sendMessage(ADMIN_ID, adminMsg, {
-                        parse_mode: 'HTML',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: "❌ Remove this video", callback_data: `remove_vid_${messageId}` }]
-                            ]
-                        }
-                    });
-                } catch (uploadErr) {
-                    console.error("Direct db sync alert failed:", uploadErr.message);
-                }
+            const btnOpenProfile = document.getElementById('btnOpenTgProfile');
+            if (official) {
+                btnOpenProfile.style.display = 'none'; // The official reels channel has no personal chat
+            } else {
+                btnOpenProfile.style.display = 'flex';
+                btnOpenProfile.onclick = function() {
+                    const cleanUsername = uploaderName.replace('@', '');
+                    const profileLink = `https://t.me/${cleanUsername}`;
+                    if (tg) {
+                        tg.openTelegramLink(profileLink);
+                    } else {
+                        window.open(profileLink, '_blank');
+                    }
+                };
             }
 
-            const inlineKeyboardButtons = [];
-            inlineKeyboardButtons.push([{ text: str.play_online, url: finalAppLink }]);
+            // Wire up Save Video button for this specific video
+            const btnSave = document.getElementById('btnSaveVideoInSheet');
+            btnSave.onclick = function() { toggleSave(videoId); };
+            refreshSaveButtonUI(videoId);
 
-            const row2 = [];
-            if (audio) {
-                row2.push({ text: str.get_music, callback_data: "send_audio" });
-            }
-            if (messageId) {
-                row2.push({ text: str.wrong_video, callback_data: `wrong_video_${messageId}` });
-            }
-            if (row2.length > 0) {
-                inlineKeyboardButtons.push(row2);
-            }
-
-            inlineKeyboardButtons.push([{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]);
-
-            const videoOpts = { 
-                caption: `Use This - @SnapSavingBot` + adTextCaption,
-                parse_mode: 'HTML',
-                reply_markup: { inline_keyboard: inlineKeyboardButtons }
+            // Wire up Report Video button
+            const btnReport = document.getElementById('btnReportVideoInSheet');
+            btnReport.onclick = function() {
+                closeUploaderSheet();
+                reportVideo(videoId);
             };
 
-            let finalVideoSource = video.url;
-            if (messageId && uploadingReels) {
-                const snap = await db.ref(`mini_app_videos/${messageId}`).once('value');
-                if (snap.exists() && snap.val().fileId) {
-                    finalVideoSource = snap.val().fileId;
+            document.getElementById('uploaderSheet').classList.add('open');
+        }
+
+        function closeUploaderSheet() {
+            document.getElementById('uploaderSheet').classList.remove('open');
+        }
+
+        async function reportVideo(videoId) {
+            const confirmMsg = appLang === "bn" ? "রিপোর্ট করতে চান?" : "Do you want to report this?";
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                await fetch('/api/video/report', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ videoId, userId: currentUser.id, username: currentUser.username })
+                });
+                showToast(appLang === "bn" ? "রিপোর্ট সফল হয়েছে" : "Reported successfully");
+            } catch (err) { console.error(err); }
+        }
+
+        function markAsWatched(videoId) {
+            let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
+            if (!seenVideos.includes(videoId)) {
+                seenVideos.push(videoId);
+                localStorage.setItem('seen_videos', JSON.stringify(seenVideos));
+            }
+        }
+
+        async function trackView(videoId) {
+            try {
+                await fetch('/api/video/view', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ videoId, userId: currentUser.id })
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        function refreshFeed(event) {
+            if (event) event.stopPropagation();
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.style.visibility = 'visible';
+                loader.style.opacity = '1';
+            }
+            fetchVideos();
+        }
+
+        function setupIntersectionObserver() {
+            const observerOptions = { root: container, threshold: 0.6 };
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const video = entry.target.querySelector('video');
+                    const videoId = entry.target.id.replace('reel-', '');
+                    const index = parseInt(entry.target.getAttribute('data-index'));
+                    const playIndicator = entry.target.querySelector('.play-indicator');
+
+                    if (video) {
+                        if (entry.isIntersecting) {
+                            activeIndex = index;
+                            updateVideoSources(activeIndex);
+                            if (playIndicator) playIndicator.classList.remove('show');
+
+                            // Explicit play unmuted on swipe/intersection
+                            video.muted = false;
+                            video.play().then(() => trackView(videoId)).catch(() => {
+                                video.muted = true;
+                                video.play().catch(() => {});
+                            });
+                        } else {
+                            video.pause();
+                            if (playIndicator) playIndicator.classList.remove('show');
+                        }
+                    }
+                });
+            }, observerOptions);
+            document.querySelectorAll('.reel').forEach(reel => observer.observe(reel));
+        }
+
+        function setupDoubleTap() {
+            document.querySelectorAll('.reel').forEach(reel => {
+                let lastTap = 0;
+                reel.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('caption-link') || e.target.closest('.uploader-info')) return;
+
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    if (tapLength < 300 && tapLength > 0) {
+                        const videoId = reel.id.replace('reel-', '');
+                        const heartPop = document.getElementById(`heart-pop-${videoId}`);
+                        heartPop.classList.add('pop-active');
+                        setTimeout(() => heartPop.classList.remove('pop-active'), 800);
+                        const likeBtn = reel.querySelector('.action-button');
+                        if (!likeBtn.classList.contains('liked')) toggleLike(videoId);
+                    }
+                    lastTap = currentTime;
+                });
+            });
+        }
+
+        // Two-finger pinch to zoom in / out on the active video
+        function getTouchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function setupPinchZoom() {
+            document.querySelectorAll('.reel video').forEach(video => {
+                let initialDistance = null;
+                let baseScale = parseFloat(video.dataset.scale) || 1;
+
+                video.addEventListener('touchstart', function(e) {
+                    if (e.touches.length === 2) {
+                        initialDistance = getTouchDistance(e.touches);
+                        baseScale = parseFloat(video.dataset.scale) || 1;
+                    }
+                }, { passive: true });
+
+                video.addEventListener('touchmove', function(e) {
+                    if (e.touches.length === 2 && initialDistance) {
+                        e.preventDefault();
+                        const newDistance = getTouchDistance(e.touches);
+                        let scale = baseScale * (newDistance / initialDistance);
+                        scale = Math.min(Math.max(scale, 1), 3);
+                        video.style.transform = `scale(${scale})`;
+                        video.dataset.scale = scale;
+                    }
+                }, { passive: false });
+
+                video.addEventListener('touchend', function(e) {
+                    if (e.touches.length < 2) {
+                        initialDistance = null;
+                    }
+                }, { passive: true });
+            });
+        }
+
+        let activeProfileUserId = null;
+        async function openProfileModal(uploaderId, uploaderName, uploaderPic) {
+            activeProfileUserId = uploaderId;
+            document.getElementById('modalProfileName').innerText = uploaderName;
+            document.getElementById('modalProfilePic').src = uploaderPic;
+
+            let uploadingVal = true;
+            let notificationVal = true;
+
+            // Load from local storage directly first for instantaneous UI state
+            const localUpload = localStorage.getItem(`setting_upload_${uploaderId}`);
+            const localNotify = localStorage.getItem(`setting_notify_${uploaderId}`);
+
+            if (localUpload !== null) uploadingVal = localUpload === 'true';
+            if (localNotify !== null) notificationVal = localNotify === 'true';
+
+            try {
+                const res = await fetch(`/api/user/settings?userId=${uploaderId}`);
+                if (res.ok) {
+                    const settings = await res.json();
+                    uploadingVal = settings.uploadingReels !== false;
+                    notificationVal = settings.notifications !== false;
+
+                    localStorage.setItem(`setting_upload_${uploaderId}`, uploadingVal ? 'true' : 'false');
+                    localStorage.setItem(`setting_notify_${uploaderId}`, notificationVal ? 'true' : 'false');
                 }
+            } catch (err) {
+                console.log("Failed to sync modal settings with server, using local fallback");
             }
 
-            await bot.sendVideo(chatId, finalVideoSource, videoOpts);
-            
-            setTimeout(() => {
-                bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
-            }, 1000);
-        } else {
-            isDownloaded = true;
-            clearInterval(interval);
-            await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
-            await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
-        }
-    } catch (e) {
-        isDownloaded = true;
-        clearInterval(interval);
-        await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
-        await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
-    }
-}
+            document.getElementById('uploadToggle').checked = uploadingVal;
+            document.getElementById('notificationToggle').checked = notificationVal;
 
-app.listen(PORT, () => { console.log(`Server started on port ${PORT}`); });
+            if (uploaderId !== currentUser.id) {
+                document.getElementById('uploadToggle').disabled = true;
+                document.getElementById('notificationToggle').disabled = true;
+            } else {
+                document.getElementById('uploadToggle').disabled = false;
+                document.getElementById('notificationToggle').disabled = false;
+            }
+            document.getElementById('profileModal').classList.add('open');
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.remove('open');
+        }
+
+        async function updateProfileSetting() {
+            if (activeProfileUserId !== currentUser.id) return;
+            const uploadingVal = document.getElementById('uploadToggle').checked;
+            const notificationVal = document.getElementById('notificationToggle').checked;
+
+            localStorage.setItem(`setting_upload_${currentUser.id}`, uploadingVal ? 'true' : 'false');
+            localStorage.setItem(`setting_notify_${currentUser.id}`, notificationVal ? 'true' : 'false');
+
+            try {
+                await fetch('/api/user/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        userId: currentUser.id,
+                        uploadingReels: uploadingVal,
+                        notifications: notificationVal
+                    })
+                });
+                showToast("Preferences updated successfully");
+            } catch (err) {
+                console.error("Failed to sync settings", err);
+            }
+        }
+
+        applyOwnProfileChip();
+        fetchLanguageAndVideos();
+    </script>
+</body>
+</html>
