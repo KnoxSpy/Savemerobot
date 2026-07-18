@@ -61,6 +61,74 @@
             font-weight: 500;
         }
 
+        /* ===================== Slim top bar: own profile only ===================== */
+        /* Fixed, but no solid panel behind it -- just a soft fade for legibility,
+           exactly like the original app's top bar (no reserved screen space). */
+        .top-bar {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 62px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 0 16px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .own-profile-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .own-avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1.5px solid rgba(255,255,255,0.85);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            background: #1b1b1e;
+        }
+
+        .own-name {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+            max-width: 110px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .own-settings-icon {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .own-settings-icon:active {
+            transform: scale(0.88);
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .own-settings-icon svg {
+            width: 13px; height: 13px;
+            fill: #fff;
+        }
+
         /* High-Performance Container with GPU Acceleration */
         .reels-container {
             height: 100%;
@@ -149,16 +217,15 @@
         /* Overlay Interface Layer */
         .overlay {
             position: absolute;
-            bottom: var(--bar-offset, 148px);
+            bottom: 0;
             left: 0;
             width: 100%;
-            padding: 80px 16px 0 16px;
+            padding: 80px 16px 32px 16px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
             pointer-events: none;
             z-index: 5;
-            transition: bottom 0.2s ease;
         }
 
         .video-details {
@@ -185,6 +252,7 @@
             border: 2px solid #fff;
             object-fit: cover;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            background: #1b1b1e;
         }
 
         .uploader-info h3 {
@@ -197,6 +265,7 @@
             max-width: 170px;
         }
 
+        /* Caption / admin-panel ad text */
         .video-details p {
             font-size: 13px;
             opacity: 0.95;
@@ -293,6 +362,7 @@
             border-radius: 50%;
             object-fit: cover;
             border: 1.5px solid #000;
+            background: #1b1b1e;
         }
 
         .verified-badge {
@@ -353,105 +423,6 @@
             letter-spacing: 0.5px;
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
             z-index: 3;
-        }
-
-        /* ===================== Fixed Bottom Bar: Own profile + Ads ===================== */
-        .bottom-bar {
-            position: fixed;
-            bottom: 0; left: 0;
-            width: 100%;
-            z-index: 60;
-            padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)) 16px;
-            background: linear-gradient(to top, rgba(0,0,0,0.97) 35%, rgba(0,0,0,0.85) 70%, rgba(0,0,0,0) 100%);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            display: flex;
-            flex-direction: column;
-            gap: 9px;
-            pointer-events: auto;
-        }
-
-        .own-profile-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            width: fit-content;
-            max-width: 100%;
-        }
-
-        .own-avatar {
-            width: 34px; height: 34px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid rgba(255,255,255,0.9);
-            flex-shrink: 0;
-        }
-
-        .own-name {
-            font-size: 14px;
-            font-weight: 700;
-            color: #fff;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 150px;
-        }
-
-        .own-settings-icon {
-            width: 26px; height: 26px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.12);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            transition: background 0.2s ease, transform 0.2s ease;
-        }
-
-        .own-settings-icon:active {
-            transform: scale(0.88);
-            background: rgba(255,255,255,0.2);
-        }
-
-        .own-settings-icon svg {
-            width: 14px; height: 14px;
-            fill: rgba(255,255,255,0.85);
-        }
-
-        .ads-section {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .ads-label {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 1.4px;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.4);
-        }
-
-        .ad-banner-placeholder {
-            width: 100%;
-            min-height: 52px;
-            border-radius: 12px;
-            background: rgba(255,255,255,0.05);
-            border: 1px dashed rgba(255,255,255,0.15);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            color: rgba(255,255,255,0.35);
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .ad-banner-placeholder svg {
-            width: 16px; height: 16px;
-            fill: rgba(255,255,255,0.3);
         }
 
         /* ===================== Bottom Sheet Popup Styles ===================== */
@@ -530,12 +501,16 @@
             border: 2.5px solid #fe0979;
             object-fit: cover;
             box-shadow: 0 4px 15px rgba(254, 9, 121, 0.4);
+            background: #1b1b1e;
         }
 
         .profile-popup-info h4 {
             font-size: 16.5px;
             font-weight: 700;
             letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .settings-list {
@@ -595,13 +570,10 @@
         .uploader-avatar-wrap img {
             width: 100%; height: 100%;
             border-radius: 50%;
-            border: 2.5px solid transparent;
-            background: linear-gradient(45deg, #00f2fe, #fe0979) border-box;
-            -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
+            border: 2.5px solid rgba(255,255,255,0.15);
             object-fit: cover;
             box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+            background: #1b1b1e;
         }
 
         .verified-badge-lg {
@@ -617,6 +589,17 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         }
         .verified-badge-lg svg { width: 11px; height: 11px; fill: #fff; }
+
+        .inline-verified-badge {
+            width: 16px; height: 16px;
+            background: #1da1f2;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .inline-verified-badge svg { width: 9px; height: 9px; fill: #fff; }
 
         .open-chat-btn {
             display: flex;
@@ -702,7 +685,7 @@
         /* Custom Toast Notification */
         #custom-toast {
             position: fixed;
-            bottom: 220px; left: 50%;
+            bottom: 100px; left: 50%;
             transform: translateX(-50%) translateY(20px);
             background: rgba(25, 25, 25, 0.9);
             color: #fff;
@@ -735,13 +718,10 @@
         <div class="loader-text" id="loaderText">Loading Videos...</div>
     </div>
 
-    <!-- Container for dynamic reels -->
-    <div class="reels-container" id="reelsContainer"></div>
-
-    <!-- Fixed bottom bar: own profile + ads -->
-    <div class="bottom-bar" id="bottomBar">
-        <div class="own-profile-row" onclick="openProfileModal(currentUser.id, currentUser.username, currentUser.photo)">
-            <img class="own-avatar" id="ownAvatarImg" src="" alt="">
+    <!-- Slim top bar: own profile chip only (no solid panel) -->
+    <div class="top-bar">
+        <div class="own-profile-chip" onclick="openProfileModal(currentUser.id, currentUser.username, currentUser.photo)">
+            <img class="own-avatar" id="ownAvatarImg" src="" alt="" onerror="handleImgError(this)">
             <span class="own-name" id="ownNameText"></span>
             <span class="own-settings-icon" onclick="event.stopPropagation(); openProfileModal(currentUser.id, currentUser.username, currentUser.photo)">
                 <svg viewBox="0 0 24 24">
@@ -749,14 +729,10 @@
                 </svg>
             </span>
         </div>
-        <div class="ads-section">
-            <span class="ads-label" id="adsLabel">Ads</span>
-            <div class="ad-banner-placeholder">
-                <svg viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 14H4V8h16v10zM6 10h5v5H6z"/></svg>
-                <span>Advertisement</span>
-            </div>
-        </div>
     </div>
+
+    <!-- Container for dynamic reels -->
+    <div class="reels-container" id="reelsContainer"></div>
 
     <!-- Toast Component -->
     <div id="custom-toast">
@@ -771,7 +747,7 @@
                 <div class="sheet-drag-handle"></div>
             </div>
             <div class="profile-popup-info">
-                <img id="modalProfilePic" src="https://via.placeholder.com/150" alt="Profile">
+                <img id="modalProfilePic" src="" alt="Profile" onerror="handleImgError(this)">
                 <h4 id="modalProfileName">Username</h4>
             </div>
             <div class="settings-list">
@@ -803,7 +779,7 @@
 
             <div class="profile-popup-info">
                 <div class="uploader-avatar-wrap">
-                    <img id="upModalPic" src="" alt="Profile">
+                    <img id="upModalPic" src="" alt="Profile" onerror="handleImgError(this)">
                     <div id="upModalVerified" class="verified-badge-lg" style="display: none;">
                         <svg viewBox="0 0 24 24"><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20 8l-1.4-1.4z"/></svg>
                     </div>
@@ -850,17 +826,57 @@
             tg.expand();
         }
 
+        // Fallback avatar shown whenever a profile photo fails to load
+        // (old videos whose uploaderPic link has expired / broken, etc).
+        const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+            '<circle cx="32" cy="32" r="32" fill="#26262b"/>' +
+            '<circle cx="32" cy="25" r="12" fill="#5c5c66"/>' +
+            '<path d="M8 58c0-14 10.7-24 24-24s24 10 24 24" fill="#5c5c66"/>' +
+            '</svg>'
+        );
+
+        function handleImgError(img) {
+            img.onerror = null;
+            img.src = DEFAULT_AVATAR;
+        }
+
+        // Central place to resolve a profile photo URL.
+        // TODO: wire in the photo-to-link API here once its request/response
+        // format is provided, e.g.:
+        //   return `${PHOTO_LINK_API_BASE}?src=${encodeURIComponent(rawUrl)}`
+        // This keeps the bot token out of any client-side URL and lets the
+        // backend cache/store the resolved photo once instead of re-fetching
+        // it from Telegram on every load.
+        function resolvePhotoUrl(rawUrl) {
+            if (!rawUrl || rawUrl.includes('via.placeholder.com')) return DEFAULT_AVATAR;
+            return rawUrl;
+        }
+
         const currentUser = {
             id: tg?.initDataUnsafe?.user?.id || "demo_user_123",
             username: tg?.initDataUnsafe?.user?.username || "Guest_User",
-            photo: tg?.initDataUnsafe?.user?.photo_url || "https://via.placeholder.com/150"
+            photo: resolvePhotoUrl(tg?.initDataUnsafe?.user?.photo_url)
         };
 
         let videos = [];
         let appLang = "en";
         let activeIndex = 0;
-        let activeVideoId = null;
         const container = document.getElementById('reelsContainer');
+
+        // Verified / official accounts
+        function isOfficialAccount(uploaderName, uploaderId) {
+            const n = (uploaderName || '').toLowerCase();
+            return n.includes('reelsuploder') || n.includes('reelsuploader') ||
+                   uploaderId === 'reelsuploder' || uploaderId === '-1002241516027';
+        }
+        function isVerifiedAccount(uploaderName, uploaderId) {
+            const n = (uploaderName || '').toLowerCase().replace('@', '');
+            return isOfficialAccount(uploaderName, uploaderId) || n === 'spy_ofc';
+        }
+        function verifiedBadgeSvg() {
+            return '<svg viewBox="0 0 24 24" fill="#fff"><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20 8l-1.4-1.4z"/></svg>';
+        }
 
         const uiStrings = {
             en: {
@@ -875,7 +891,6 @@
                 fetching: "Preparing Feed...",
                 share: "Share",
                 openChat: "Open Chat",
-                ads: "Ads",
                 size: "Video Size",
                 date: "Upload Date",
                 views: "Views"
@@ -892,7 +907,6 @@
                 fetching: "ফিড প্রস্তুত করা হচ্ছে...",
                 share: "শেয়ার",
                 openChat: "চ্যাট খুলুন",
-                ads: "বিজ্ঞাপন",
                 size: "ভিডিও সাইজ",
                 date: "আপলোড তারিখ",
                 views: "ভিউ"
@@ -911,14 +925,13 @@
             }, 2500);
         }
 
-        function applyOwnProfileBar() {
+        function applyOwnProfileChip() {
             document.getElementById('ownAvatarImg').src = currentUser.photo;
             document.getElementById('ownNameText').innerText = currentUser.username;
         }
 
         function applyStaticStrings() {
             const str = uiStrings[appLang];
-            document.getElementById('adsLabel').innerText = str.ads;
             document.getElementById('txt-upload').innerText = str.upload_reels;
             document.getElementById('txt-notify').innerText = str.notifications;
             document.getElementById('openChatLabel').innerText = str.openChat;
@@ -937,11 +950,13 @@
                 console.error("Lang fetch failed", err);
             }
             document.getElementById('loaderText').innerText = uiStrings[appLang].fetching;
-            applyOwnProfileBar();
+            applyOwnProfileChip();
             applyStaticStrings();
             fetchVideos();
         }
 
+        // Caption text (bold / links) coming from the Admin Panel -- this
+        // IS the "ad" placement; no separate ad banner is rendered.
         function formatCaption(text) {
             if (!text) return "";
             if (text.includes('<a') || text.includes('<strong') || text.includes('<b>')) {
@@ -1017,12 +1032,11 @@
                 const streamUrl = `/api/video/stream/${encodeURIComponent(video.fileId)}`;
                 const isLiked = localStorage.getItem(`liked_${video.id}`) === 'true';
                 const uploaderName = video.uploaderName || "@reelsuploder";
-                const uploaderPic = video.uploaderPic || "https://via.placeholder.com/150";
+                const uploaderPic = resolvePhotoUrl(video.uploaderPic);
 
-                const isOfficial = uploaderName.toLowerCase().includes("reelsuploder") ||
-                                   uploaderName.toLowerCase().includes("reelsuploader") ||
-                                   video.uploaderId === "reelsuploder" ||
-                                   video.uploaderId === "-1002241516027";
+                const verified = isVerifiedAccount(uploaderName, video.uploaderId);
+                const badgeInline = verified ? `<span class="inline-verified-badge">${verifiedBadgeSvg()}</span>` : '';
+                const badgeCorner = verified ? `<div class="verified-badge">${verifiedBadgeSvg()}</div>` : '';
 
                 return `
                     <div class="reel" id="reel-${video.id}" data-index="${index}">
@@ -1044,12 +1058,12 @@
                         </div>
 
                         <div class="overlay">
-                            <!-- Left Info Panel: dynamic uploader info -->
+                            <!-- Left Info Panel: dynamic uploader info + admin-panel caption/ad text -->
                             <div class="video-details">
                                 <div class="uploader-info" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
-                                    <img src="${uploaderPic}" alt="${uploaderName}">
+                                    <img src="${uploaderPic}" alt="${uploaderName}" onerror="handleImgError(this)">
                                     <h3>${uploaderName}</h3>
-                                    ${isOfficial ? `<div class="verified-badge" style="position:static; margin-left:4px;"><svg viewBox="0 0 24 24" fill="#fff"><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20 8l-1.4-1.4z"/></svg></div>` : ''}
+                                    ${badgeInline}
                                 </div>
                                 <p>${formatCaption(video.caption) || str.no_caption}</p>
                             </div>
@@ -1058,9 +1072,9 @@
                                 <!-- Uploader profile picture (opens uploader popup) -->
                                 <div class="uploader-panel-pic-wrapper" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
                                     <div class="uploader-panel-pic">
-                                        <img src="${uploaderPic}" alt="${uploaderName}">
+                                        <img src="${uploaderPic}" alt="${uploaderName}" onerror="handleImgError(this)">
                                     </div>
-                                    ${isOfficial ? `<div class="verified-badge"><svg viewBox="0 0 24 24" fill="#fff"><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20 8l-1.4-1.4z"/></svg></div>` : ''}
+                                    ${badgeCorner}
                                 </div>
 
                                 <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
@@ -1099,17 +1113,7 @@
             setupIntersectionObserver();
             setupDoubleTap();
             setupPinchZoom();
-            adjustOverlayOffset();
         }
-
-        // Position the per-video overlay just above the fixed bottom bar
-        function adjustOverlayOffset() {
-            const bar = document.getElementById('bottomBar');
-            if (!bar) return;
-            const offset = bar.offsetHeight + 14;
-            document.documentElement.style.setProperty('--bar-offset', `${offset}px`);
-        }
-        window.addEventListener('resize', adjustOverlayOffset);
 
         // Optimized Autoplay sound workaround on user touch
         function forceUnmuteActiveVideo() {
@@ -1215,7 +1219,7 @@
             } catch (err) { console.error(err); }
         }
 
-        // Save now lives inside the uploader/video-info popup
+        // Save lives inside the uploader/video-info popup
         function refreshSaveButtonUI(videoId) {
             const str = uiStrings[appLang];
             const isSaved = localStorage.getItem(`saved_${videoId}`) === 'true';
@@ -1276,11 +1280,8 @@
         }
 
         function handleUploaderClick(uploaderId, uploaderName, uploaderPic, size, date, views, videoId) {
-            activeVideoId = videoId;
-            const isOfficial = uploaderName.toLowerCase().includes("reelsuploder") ||
-                               uploaderName.toLowerCase().includes("reelsuploader") ||
-                               uploaderId === "reelsuploder" ||
-                               uploaderId === "-1002241516027";
+            const official = isOfficialAccount(uploaderName, uploaderId);
+            const verified = isVerifiedAccount(uploaderName, uploaderId);
 
             // Open bottom-sheet details popup
             document.getElementById('upModalPic').src = uploaderPic;
@@ -1289,17 +1290,13 @@
             document.getElementById('upModalDate').innerText = date || "Unknown Date";
             document.getElementById('upModalViews').innerText = views || "0";
 
-            // Verified Badge render inside popup
-            const popupVerifiedBadge = document.getElementById('upModalVerified');
+            document.getElementById('upModalVerified').style.display = verified ? 'flex' : 'none';
+
             const btnOpenProfile = document.getElementById('btnOpenTgProfile');
-
-            if (isOfficial) {
-                popupVerifiedBadge.style.display = 'flex';
-                btnOpenProfile.style.display = 'none'; // Hide Open Chat button for the official channel
+            if (official) {
+                btnOpenProfile.style.display = 'none'; // The official reels channel has no personal chat
             } else {
-                popupVerifiedBadge.style.display = 'none';
-                btnOpenProfile.style.display = 'flex'; // Show Open Chat button for regular uploaders
-
+                btnOpenProfile.style.display = 'flex';
                 btnOpenProfile.onclick = function() {
                     const cleanUsername = uploaderName.replace('@', '');
                     const profileLink = `https://t.me/${cleanUsername}`;
@@ -1533,8 +1530,7 @@
             }
         }
 
-        applyOwnProfileBar();
-        adjustOverlayOffset();
+        applyOwnProfileChip();
         fetchLanguageAndVideos();
     </script>
 </body>
