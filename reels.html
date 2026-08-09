@@ -68,12 +68,12 @@
             position: fixed;
             top: 0; left: 0;
             width: 100%;
-            height: 62px;
+            min-height: 62px;
             background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
             display: flex;
             justify-content: flex-end;
             align-items: center;
-            padding: 0 16px;
+            padding: var(--tg-safe-top, 0px) 16px 0 16px;
             z-index: 100;
             pointer-events: none;
         }
@@ -167,7 +167,7 @@
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.92) 100%);
+            background: linear-gradient(to bottom, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0) 14%, rgba(0,0,0,0) 70%, rgba(0,0,0,0.78) 100%);
             pointer-events: none;
             z-index: 2;
         }
@@ -176,12 +176,13 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
+            object-position: center center;
+            margin: auto;
             opacity: 0;
             transform: scale(1);
             transform-origin: center center;
             touch-action: pan-y;
             transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1);
-            image-rendering: -webkit-optimize-contrast;
             background-color: #000;
         }
 
@@ -824,6 +825,41 @@
         if (tg) {
             tg.ready();
             tg.expand();
+
+            // Always open in Telegram's full-screen mode, no matter which
+            // link/entry point was used to launch the Mini App.
+            try {
+                if (typeof tg.requestFullscreen === 'function') {
+                    tg.requestFullscreen();
+                }
+            } catch (e) {
+                console.log('Fullscreen not supported on this client', e);
+            }
+
+            // Ask for confirmation instead of closing instantly when the
+            // user presses the phone's back button / swipes to close.
+            if (typeof tg.enableClosingConfirmation === 'function') {
+                tg.enableClosingConfirmation();
+            }
+        }
+
+        // Keep our own top-bar below Telegram's own fullscreen chrome
+        // (back / close / menu icons), which reserve a safe area on some
+        // clients. This never affects layout when there is no such inset.
+        function applyTelegramSafeArea() {
+            if (!tg) return;
+            const top = (tg.contentSafeAreaInset && tg.contentSafeAreaInset.top)
+                || (tg.safeAreaInset && tg.safeAreaInset.top)
+                || 0;
+            document.documentElement.style.setProperty('--tg-safe-top', `${top}px`);
+        }
+        if (tg) {
+            applyTelegramSafeArea();
+            if (typeof tg.onEvent === 'function') {
+                tg.onEvent('safeAreaChanged', applyTelegramSafeArea);
+                tg.onEvent('contentSafeAreaChanged', applyTelegramSafeArea);
+                tg.onEvent('fullscreenChanged', applyTelegramSafeArea);
+            }
         }
 
         // Fallback avatar shown whenever a profile photo fails to load
@@ -842,12 +878,10 @@
         }
 
         // Central place to resolve a profile photo URL.
-        // TODO: wire in the photo-to-link API here once its request/response
-        // format is provided, e.g.:
-        //   return `${PHOTO_LINK_API_BASE}?src=${encodeURIComponent(rawUrl)}`
-        // This keeps the bot token out of any client-side URL and lets the
-        // backend cache/store the resolved photo once instead of re-fetching
-        // it from Telegram on every load.
+        // Profile photos are expected to already be ImgBB URLs (uploaded by
+        // the backend -- see the separate upload helper). The frontend just
+        // displays whatever URL it is given and falls back to a default
+        // avatar if it's missing or fails to load.
         function resolvePhotoUrl(rawUrl) {
             if (!rawUrl || rawUrl.includes('via.placeholder.com')) return DEFAULT_AVATAR;
             return rawUrl;
@@ -981,13 +1015,29 @@
             return safeText;
         }
 
+        // Feed is loaded 10 videos at a time; the next 10 are fetched
+        // automatically once the last loaded video becomes active.
+        const PAGE_SIZE = 10;
+        let pageOffset = 0;
+        let isLoadingMore = false;
+        let hasMoreVideos = true;
+
+        function sortBatch(list) {
+            list.sort((a, b) => {
+                const dateA = a.timestamp ? new Date(a.timestamp) : parseInt(a.id) || 0;
+                const dateB = b.timestamp ? new Date(b.timestamp) : parseInt(b.id) || 0;
+                return dateB - dateA;
+            });
+            return list;
+        }
+
         async function fetchVideos() {
             try {
                 let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
                 const response = await fetch('/api/videos', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: currentUser.id, seenVideos: seenVideos })
+                    body: JSON.stringify({ userId: currentUser.id, seenVideos: seenVideos, limit: PAGE_SIZE, offset: 0 })
                 });
 
                 const data = await response.json();
@@ -995,28 +1045,126 @@
                     localStorage.setItem('seen_videos', '[]');
                 }
 
-                videos = data.videos || [];
-
-                videos.sort((a, b) => {
-                    const dateA = a.timestamp ? new Date(a.timestamp) : parseInt(a.id) || 0;
-                    const dateB = b.timestamp ? new Date(b.timestamp) : parseInt(b.id) || 0;
-                    return dateB - dateA;
-                });
+                let batch = sortBatch(data.videos || []);
 
                 const startParam = tg?.initDataUnsafe?.start_param;
                 if (startParam) {
-                    const matchedIndex = videos.findIndex(v => String(v.id) === String(startParam));
+                    const matchedIndex = batch.findIndex(v => String(v.id) === String(startParam));
                     if (matchedIndex !== -1) {
-                        const matchedVideo = videos.splice(matchedIndex, 1)[0];
-                        videos.unshift(matchedVideo);
+                        const matchedVideo = batch.splice(matchedIndex, 1)[0];
+                        batch.unshift(matchedVideo);
                     }
                 }
+
+                videos = batch;
+                pageOffset = batch.length;
+                hasMoreVideos = batch.length >= PAGE_SIZE;
 
                 renderVideos();
             } catch (err) {
                 console.error("Failed to load videos", err);
                 hideLoader();
             }
+        }
+
+        async function loadMoreVideos() {
+            if (isLoadingMore || !hasMoreVideos) return;
+            isLoadingMore = true;
+            try {
+                let seenVideos = JSON.parse(localStorage.getItem('seen_videos') || '[]');
+                const response = await fetch('/api/videos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: currentUser.id, seenVideos: seenVideos, limit: PAGE_SIZE, offset: pageOffset })
+                });
+
+                const data = await response.json();
+                const batch = sortBatch(data.videos || []);
+
+                if (batch.length < PAGE_SIZE) hasMoreVideos = false;
+                pageOffset += batch.length;
+
+                if (batch.length > 0) {
+                    appendMoreVideos(batch);
+                }
+            } catch (err) {
+                console.error("Failed to load more videos", err);
+            } finally {
+                isLoadingMore = false;
+            }
+        }
+
+        function buildReelHtml(video, index) {
+            const str = uiStrings[appLang];
+            const streamUrl = `/api/video/stream/${encodeURIComponent(video.fileId)}`;
+            const isLiked = localStorage.getItem(`liked_${video.id}`) === 'true';
+            const uploaderName = video.uploaderName || "@reelsuploder";
+            const uploaderPic = resolvePhotoUrl(video.uploaderPic);
+
+            const verified = isVerifiedAccount(uploaderName, video.uploaderId);
+            const badgeInline = verified ? `<span class="inline-verified-badge">${verifiedBadgeSvg()}</span>` : '';
+
+            return `
+                <div class="reel" id="reel-${video.id}" data-index="${index}">
+                    <div class="vignette-overlay"></div>
+                    <div class="loading">${str.loading}</div>
+
+                    <div class="play-indicator">
+                        <svg viewBox="0 0 24 24" width="36" height="36" fill="#fff">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                    </div>
+
+                    <video data-src="${streamUrl}" loop playsinline webkit-playsinline preload="none" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
+
+                    <div class="heart-pop" id="heart-pop-${video.id}">
+                        <svg viewBox="0 0 24 24" width="90" height="90" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                    </div>
+
+                    <div class="overlay">
+                        <!-- Left Info Panel: dynamic uploader info + admin-panel caption/ad text -->
+                        <div class="video-details">
+                            <div class="uploader-info" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
+                                <img src="${uploaderPic}" alt="${uploaderName}" onerror="handleImgError(this)">
+                                <h3>${uploaderName}</h3>
+                                ${badgeInline}
+                            </div>
+                            <p><strong>Ads |</strong> ${formatCaption(video.caption) || str.no_caption}</p>
+                        </div>
+
+                        <div class="actions-panel">
+                            <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
+                                <div class="action-icon">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                    </svg>
+                                </div>
+                                <span id="like-count-${video.id}">${video.likes || 0}</span>
+                            </button>
+
+                            <button class="action-button" onclick="shareVideo('${video.id}', event)">
+                                <div class="action-icon" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe; border-color: rgba(0, 242, 254, 0.25);">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                                    </svg>
+                                </div>
+                                <span style="color: #00f2fe;">${str.share}</span>
+                            </button>
+
+                            <button class="action-button" onclick="refreshFeed(event)">
+                                <div class="action-icon">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/>
+                                    </svg>
+                                </div>
+                                <span>${str.refresh}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         function renderVideos() {
@@ -1026,93 +1174,31 @@
                 return;
             }
 
-            const str = uiStrings[appLang];
-
-            container.innerHTML = videos.map((video, index) => {
-                const streamUrl = `/api/video/stream/${encodeURIComponent(video.fileId)}`;
-                const isLiked = localStorage.getItem(`liked_${video.id}`) === 'true';
-                const uploaderName = video.uploaderName || "@reelsuploder";
-                const uploaderPic = resolvePhotoUrl(video.uploaderPic);
-
-                const verified = isVerifiedAccount(uploaderName, video.uploaderId);
-                const badgeInline = verified ? `<span class="inline-verified-badge">${verifiedBadgeSvg()}</span>` : '';
-                const badgeCorner = verified ? `<div class="verified-badge">${verifiedBadgeSvg()}</div>` : '';
-
-                return `
-                    <div class="reel" id="reel-${video.id}" data-index="${index}">
-                        <div class="vignette-overlay"></div>
-                        <div class="loading">${str.loading}</div>
-
-                        <div class="play-indicator">
-                            <svg viewBox="0 0 24 24" width="36" height="36" fill="#fff">
-                                <path d="M8 5v14l11-7z"/>
-                            </svg>
-                        </div>
-
-                        <video data-src="${streamUrl}" loop playsinline webkit-playsinline preload="none" onloadedmetadata="videoLoaded(this)" onclick="togglePlay(this)" onended="markAsWatched('${video.id}')"></video>
-
-                        <div class="heart-pop" id="heart-pop-${video.id}">
-                            <svg viewBox="0 0 24 24" width="90" height="90" fill="currentColor">
-                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                            </svg>
-                        </div>
-
-                        <div class="overlay">
-                            <!-- Left Info Panel: dynamic uploader info + admin-panel caption/ad text -->
-                            <div class="video-details">
-                                <div class="uploader-info" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
-                                    <img src="${uploaderPic}" alt="${uploaderName}" onerror="handleImgError(this)">
-                                    <h3>${uploaderName}</h3>
-                                    ${badgeInline}
-                                </div>
-                                <p>${formatCaption(video.caption) || str.no_caption}</p>
-                            </div>
-
-                            <div class="actions-panel">
-                                <!-- Uploader profile picture (opens uploader popup) -->
-                                <div class="uploader-panel-pic-wrapper" onclick="handleUploaderClick('${video.uploaderId}', '${uploaderName}', '${uploaderPic}', '${video.formattedSize || "Unknown Size"}', '${video.formattedDate || "Unknown Date"}', '${video.views || 0}', '${video.id}')">
-                                    <div class="uploader-panel-pic">
-                                        <img src="${uploaderPic}" alt="${uploaderName}" onerror="handleImgError(this)">
-                                    </div>
-                                    ${badgeCorner}
-                                </div>
-
-                                <button class="action-button ${isLiked ? 'liked' : ''}" onclick="toggleLike('${video.id}', event)">
-                                    <div class="action-icon">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                                        </svg>
-                                    </div>
-                                    <span id="like-count-${video.id}">${video.likes || 0}</span>
-                                </button>
-
-                                <button class="action-button" onclick="shareVideo('${video.id}', event)">
-                                    <div class="action-icon" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe; border-color: rgba(0, 242, 254, 0.25);">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
-                                        </svg>
-                                    </div>
-                                    <span style="color: #00f2fe;">${str.share}</span>
-                                </button>
-
-                                <button class="action-button" onclick="refreshFeed(event)">
-                                    <div class="action-icon">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/>
-                                        </svg>
-                                    </div>
-                                    <span>${str.refresh}</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            container.innerHTML = videos.map((video, index) => buildReelHtml(video, index)).join('');
 
             updateVideoSources(0);
-            setupIntersectionObserver();
-            setupDoubleTap();
-            setupPinchZoom();
+            const allReels = document.querySelectorAll('.reel');
+            setupIntersectionObserver(allReels);
+            setupDoubleTap(allReels);
+            setupPinchZoom(allReels);
+        }
+
+        // Append the next page of videos without disturbing the reel that
+        // is currently playing.
+        function appendMoreVideos(newVideos) {
+            const startIndex = videos.length;
+            videos = videos.concat(newVideos);
+
+            const html = newVideos.map((video, i) => buildReelHtml(video, startIndex + i)).join('');
+            container.insertAdjacentHTML('beforeend', html);
+
+            const newReelEls = newVideos
+                .map(v => document.getElementById(`reel-${v.id}`))
+                .filter(Boolean);
+
+            setupIntersectionObserver(newReelEls);
+            setupDoubleTap(newReelEls);
+            setupPinchZoom(newReelEls);
         }
 
         // Optimized Autoplay sound workaround on user touch
@@ -1369,39 +1455,50 @@
             fetchVideos();
         }
 
-        function setupIntersectionObserver() {
-            const observerOptions = { root: container, threshold: 0.6 };
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    const video = entry.target.querySelector('video');
-                    const videoId = entry.target.id.replace('reel-', '');
-                    const index = parseInt(entry.target.getAttribute('data-index'));
-                    const playIndicator = entry.target.querySelector('.play-indicator');
+        let reelObserver = null;
 
-                    if (video) {
-                        if (entry.isIntersecting) {
-                            activeIndex = index;
-                            updateVideoSources(activeIndex);
-                            if (playIndicator) playIndicator.classList.remove('show');
+        function setupIntersectionObserver(reelEls) {
+            const targets = reelEls || document.querySelectorAll('.reel');
+            if (!reelObserver) {
+                const observerOptions = { root: container, threshold: 0.6 };
+                reelObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        const video = entry.target.querySelector('video');
+                        const videoId = entry.target.id.replace('reel-', '');
+                        const index = parseInt(entry.target.getAttribute('data-index'));
+                        const playIndicator = entry.target.querySelector('.play-indicator');
 
-                            // Explicit play unmuted on swipe/intersection
-                            video.muted = false;
-                            video.play().then(() => trackView(videoId)).catch(() => {
-                                video.muted = true;
-                                video.play().catch(() => {});
-                            });
-                        } else {
-                            video.pause();
-                            if (playIndicator) playIndicator.classList.remove('show');
+                        if (video) {
+                            if (entry.isIntersecting) {
+                                activeIndex = index;
+                                updateVideoSources(activeIndex);
+                                if (playIndicator) playIndicator.classList.remove('show');
+
+                                // Explicit play unmuted on swipe/intersection
+                                video.muted = false;
+                                video.play().then(() => trackView(videoId)).catch(() => {
+                                    video.muted = true;
+                                    video.play().catch(() => {});
+                                });
+
+                                // Reached the last loaded video -- fetch the next 10
+                                if (index >= videos.length - 1) {
+                                    loadMoreVideos();
+                                }
+                            } else {
+                                video.pause();
+                                if (playIndicator) playIndicator.classList.remove('show');
+                            }
                         }
-                    }
-                });
-            }, observerOptions);
-            document.querySelectorAll('.reel').forEach(reel => observer.observe(reel));
+                    });
+                }, observerOptions);
+            }
+            targets.forEach(reel => reelObserver.observe(reel));
         }
 
-        function setupDoubleTap() {
-            document.querySelectorAll('.reel').forEach(reel => {
+        function setupDoubleTap(reelEls) {
+            const targets = reelEls || document.querySelectorAll('.reel');
+            targets.forEach(reel => {
                 let lastTap = 0;
                 reel.addEventListener('click', function(e) {
                     if (e.target.classList.contains('caption-link') || e.target.closest('.uploader-info')) return;
@@ -1428,8 +1525,12 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
-        function setupPinchZoom() {
-            document.querySelectorAll('.reel video').forEach(video => {
+        function setupPinchZoom(reelEls) {
+            const targets = reelEls
+                ? Array.from(reelEls).map(reel => reel.querySelector('video')).filter(Boolean)
+                : document.querySelectorAll('.reel video');
+
+            targets.forEach(video => {
                 let initialDistance = null;
                 let baseScale = parseFloat(video.dataset.scale) || 1;
 
