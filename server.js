@@ -24,7 +24,7 @@ const ADMIN_ID = '7304915019';
 
 const DOMAIN_NAME = process.env.DOMAIN_NAME || 'snapsaving-reels.vercel.app';
 
-// strings অবজেক্টে সেভ ক্যাপশনের নতুন ট্রান্সলেশন যুক্ত করা হয়েছে
+// strings অবজেক্টে সেভ ক্যাপশনের নতুন ট্রান্সলেশন যুক্ত করা হয়েছে
 const strings = {
     en: {
         welcome: "Welcome to SnapSaving! Send me any social media video link to download.",
@@ -48,11 +48,24 @@ const strings = {
         watch_btn: "Watch Video",
         
         // Added Buttons
-        play_online: "Play Online Video 🎬",
+        play_online: "🔴 Play this Video Online 🎬",
         get_music: "Get Music 🎵",
-        wrong_video: "Wrong Video ❌",
+        wrong_video: "Wrong Video ⚠️",
         wrong_video_deleted: "✅ Video has been removed! Please send the link of the video you want to download.",
         check_video: "Check Video 🎬",
+
+        // Settings / "Menu" inline keyboard (from /settings)
+        menu_open_app: "Open Tiktok 🎬",
+        menu_language: "Language 🌐",
+        menu_auto_upload: "Auto Upload 🛰️",
+        auto_upload_on_toast: "🛰️ Auto Upload is now ON",
+        auto_upload_off_toast: "🛰️ Auto Upload is now OFF",
+
+        // Video caption sent back to the user
+        caption_shots_by: "Shots by:",
+        caption_download_by: "Download by: @SnapSavingBot",
+        caption_ads_prefix: "Ads |",
+        video_ready_msg: "✅ Ready! Send another link anytime.",
         
         // New Mini-App Save Caption
         save_success_caption: "💿 <b>Save Success!</b>\n\nThis video has been saved from @SnapSavingBot. <a href=\"https://t.me/SnapSavingBot/reels\">Click here</a> for more Reels of this type.",
@@ -67,18 +80,18 @@ const strings = {
     },
     bn: {
         welcome: "SnapSaving-এ স্বাগতম! ভিডিও ডাউনলোড করতে যেকোনো লিংক পাঠান।",
-        must_join: "⚠️ আমাদের চ্যানেলে জয়েন করতে হবে এই বটটি ব্যবহার করতে!",
+        must_join: "⚠️ আমাদের চ্যানেলে জয়েন করতে হবে এই বটটি ব্যবহার করতে!",
         verify: "✅ ভেরিফাই করুন",
-        not_joined: "❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!",
+        not_joined: "❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!",
         sending_audio: "অডিও পাঠানো হচ্ছে...",
-        video_not_found: "❌ ভিডিও পাওয়া যায়নি।",
-        error_fetch: "❌ কোন একটি সমস্যা হচ্ছে অথবা ভিডিও টি খুজে পাওয়া যায়নি অন্য ভিডিও লিংক দিন।",
-        join_ch: "📢 চ্যানেলে জয়েন করুন",
-        join_gr: "👥 গ্রুপে জয়েন করুন",
+        video_not_found: "❌ ভিডিও পাওয়া যায়নি।",
+        error_fetch: "❌ কোন একটি সমস্যা হচ্ছে অথবা ভিডিও টি খুজে পাওয়া যায়নি অন্য ভিডিও লিংক দিন।",
+        join_ch: "📢 চ্যানেলে জয়েন করুন",
+        join_gr: "👥 গ্রুপে জয়েন করুন",
         add_gr: "➕ গ্রুপে বট যুক্ত করুন",
         lang_btn: "🇬🇧 Change to English",
-        lang_switched: "ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
-        settings_title: "⚙️ <b>আপনার সেটিংস ও পছন্দসমূহ</b>\n\nনিচের বাটনগুলো দিয়ে আপনার মিনি অ্যাপের সেটিংস পরিবর্তন করুন:",
+        lang_switched: "ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
+        settings_title: "⚙️ <b>আপনার সেটিংস ও পছন্দসমূহ</b>\n\nনিচের বাটনগুলো দিয়ে আপনার মিনি অ্যাপের সেটিংস পরিবর্তন করুন:",
         notify_on: "নোটিফিকেশন: চালু 🔔",
         notify_off: "নোটিফিকেশন: বন্ধ 🔕",
         upload_on: "রিল আপলোড: চালু 📤",
@@ -87,14 +100,27 @@ const strings = {
         watch_btn: "Watch Video",
         
         // Added Buttons
-        play_online: "Play Online Video 🎬",
+        play_online: "🔴 Play this Video Online 🎬",
         get_music: "Get Music 🎵",
-        wrong_video: "Wrong Video ❌",
-        wrong_video_deleted: "✅ ভিডিওটি রিমুভ করা হয়েছে! আপনি যে ভিডিও টি ডাউনলোড করতে চান লিংক দিন।",
+        wrong_video: "Wrong Video ⚠️",
+        wrong_video_deleted: "✅ ভিডিওটি রিমুভ করা হয়েছে! আপনি যে ভিডিও টি ডাউনলোড করতে চান লিংক দিন।",
         check_video: "Check Video 🎬",
+
+        // Settings / "Menu" inline keyboard (from /settings)
+        menu_open_app: "Open Tiktok 🎬",
+        menu_language: "ভাষা 🌐",
+        menu_auto_upload: "অটো আপলোড 🛰️",
+        auto_upload_on_toast: "🛰️ অটো আপলোড চালু হয়েছে",
+        auto_upload_off_toast: "🛰️ অটো আপলোড বন্ধ হয়েছে",
+
+        // Video caption sent back to the user
+        caption_shots_by: "Shots by:",
+        caption_download_by: "Download by: @SnapSavingBot",
+        caption_ads_prefix: "Ads |",
+        video_ready_msg: "✅ প্রস্তুত! যেকোনো সময় আরেকটি লিংক পাঠান।",
         
         // New Mini-App Save Caption
-        save_success_caption: "💿 <b>সেভ সফল হয়েছে!</b>\n\nএই ভিডিওটি @SnapSavingBot থেকে সেভ করা হয়েছে। এই ধরণের আরও রিল দেখতে <a href=\"https://t.me/SnapSavingBot/reels\">এখানে ক্লিক করুন</a>।",
+        save_success_caption: "💿 <b>সেভ সফল হয়েছে!</b>\n\nএই ভিডিওটি @SnapSavingBot থেকে সেভ করা হয়েছে। এই ধরণের আরও রিল দেখতে <a href=\"https://t.me/SnapSavingBot/reels\">এখানে ক্লিক করুন</a>।",
         
         // Dynamic Notifications
         notif_view_title: "👁️ <b>কেউ আপনার রিলটি দেখেছে!</b>\n",
@@ -208,18 +234,12 @@ async function getSettingsKeyboard(chatId) {
     const lang = await getUserLang(chatId);
     const str = strings[lang];
 
-    const settingsSnap = await db.ref(`users/${chatId}/settings`).once('value');
-    const settings = settingsSnap.val() || { uploadingReels: true, notifications: true };
-
-    const notifyBtnText = settings.notifications !== false ? str.notify_on : str.notify_off;
-    const uploadBtnText = settings.uploadingReels !== false ? str.upload_on : str.upload_off;
-
     return {
         inline_keyboard: [
-            [{ text: str.change_lang, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }],
+            [{ text: str.menu_open_app, url: "https://t.me/SnapSavingBot/reels" }],
             [
-                { text: notifyBtnText, callback_data: 'toggle_notify' },
-                { text: uploadBtnText, callback_data: 'toggle_upload' }
+                { text: str.menu_language, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' },
+                { text: str.menu_auto_upload, callback_data: 'toggle_upload' }
             ]
         ]
     };
@@ -545,7 +565,7 @@ app.post('/api/video/save', async (req, res) => {
         if (!video) return res.status(404).json({ error: "Video not found" });
 
         if (isSaved) {
-            // ইউজারের ভাষা ডাটাবেজ থেকে খুঁজে নিয়ে সেই ভাষার ক্যাপশন সেট করা হচ্ছে
+            // ইউজারের ভাষা ডাটাবেজ থেকে খুঁজে নিয়ে সেই ভাষার ক্যাপশন সেট করা হচ্ছে
             const userLang = await getUserLang(userId);
             const str = strings[userLang];
 
@@ -653,6 +673,46 @@ async function getMissingChannels(userId) {
     } catch (e) { return []; }
 }
 
+// Detects which platform a video link came from, used in the "Shots by:" line.
+function detectPlatform(url) {
+    const u = (url || '').toLowerCase();
+    if (u.includes('tiktok.com')) return '#Tiktok';
+    if (u.includes('instagram.com')) return '#Instagram';
+    if (u.includes('facebook.com') || u.includes('fb.watch')) return '#Facebook';
+    if (u.includes('twitter.com') || u.includes('x.com')) return '#Twitter';
+    if (u.includes('youtube.com') || u.includes('youtu.be')) return '#Youtube';
+    if (u.includes('pinterest.com')) return '#Pinterest';
+    if (u.includes('reddit.com')) return '#Reddit';
+    if (u.includes('snapchat.com')) return '#Snapchat';
+    if (u.includes('likee.')) return '#Likee';
+    if (u.includes('capcut.')) return '#CapCut';
+    if (u.includes('threads.net')) return '#Threads';
+    return '#Video';
+}
+
+// Builds the caption sent back with the downloaded video:
+//   Shots by: #Tiktok
+//   Download by: @SnapSavingBot
+//
+//   Ads | <admin panel ads text>   ("Ads |" bold)
+async function buildVideoCaption(lang, sourceUrl) {
+    const str = strings[lang];
+    const platformTag = detectPlatform(sourceUrl);
+
+    let adsLine = "";
+    try {
+        const adminSnap = await db.ref('admin_settings').once('value');
+        const settings = adminSnap.val() || {};
+        const ads = settings.ads || [];
+        if (ads.length > 0) {
+            const randomAd = ads[Math.floor(Math.random() * ads.length)];
+            adsLine = `\n\n<b>${str.caption_ads_prefix}</b> <a href="${randomAd.link}">${randomAd.text}</a>`;
+        }
+    } catch (adErr) {}
+
+    return `${str.caption_shots_by} ${platformTag}\n${str.caption_download_by}${adsLine}`;
+}
+
 bot.on('channel_post', async (msg) => {
     const targetChannel = TARGET_CHANNEL;
 
@@ -716,20 +776,12 @@ bot.on('message', async (msg) => {
             const welcomeMsg = data.welcomeText || str.welcome;
             const welcomeImg = data.welcomeImage || "https://telegra.ph/file/default.jpg";
 
-            const inlineKeyboard = [
-                [{ text: str.watch_btn, url: "https://t.me/SnapSavingBot/reels" }],
-                [{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]
-            ];
-
             try {
                 await bot.sendPhoto(chatId, welcomeImg, {
-                    caption: welcomeMsg,
-                    reply_markup: { inline_keyboard: inlineKeyboard }
+                    caption: welcomeMsg
                 });
             } catch (imgErr) {
-                await bot.sendMessage(chatId, welcomeMsg, {
-                    reply_markup: { inline_keyboard: inlineKeyboard }
-                });
+                await bot.sendMessage(chatId, welcomeMsg);
             }
 
             const helperText = lang === 'bn'
@@ -866,7 +918,7 @@ bot.on('callback_query', async (q) => {
             message_id: q.message.message_id
         }).catch(() => {});
 
-        await bot.answerCallbackQuery(q.id, { text: "Reels Upload settings updated!" });
+        await bot.answerCallbackQuery(q.id, { text: newUpload ? str.auto_upload_on_toast : str.auto_upload_off_toast });
         return;
     }
 
@@ -880,7 +932,7 @@ bot.on('callback_query', async (q) => {
             await db.ref(`mini_app_videos/${messageId}`).remove();
             await bot.deleteMessage(`@${TARGET_CHANNEL}`, parseInt(messageId)).catch(() => {});
             
-            await bot.editMessageText(`✅ <b>ভিডিওটি অ্যাপ এবং সার্ভার থেকে রিমুভ করা হয়েছে!</b>`, {
+            await bot.editMessageText(`✅ <b>ভিডিওটি অ্যাপ এবং সার্ভার থেকে রিমুভ করা হয়েছে!</b>`, {
                 chat_id: q.message.chat.id,
                 message_id: q.message.message_id,
                 parse_mode: 'HTML'
@@ -984,17 +1036,6 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             const audio = data.medias.find(m => m.type === 'audio');
             if (audio) audioCache[chatId] = audio.url;
 
-            let adTextCaption = "";
-            try {
-                const adminSnap = await db.ref('admin_settings').once('value');
-                const settings = adminSnap.val() || {};
-                const ads = settings.ads || [];
-                if (ads.length > 0) {
-                    const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                    adTextCaption = `\n\nAds <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
-                }
-            } catch (adErr) {}
-
             let messageId = null;
             let finalAppLink = `https://t.me/SnapSavingBot/reels`;
 
@@ -1040,7 +1081,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                         timestamp: admin.database.ServerValue.TIMESTAMP
                     });
 
-                    const adminMsg = `⚠️ <b>নতুন ভিডিও আপলোড হয়েছে!</b>\n\n` +
+                    const adminMsg = `⚠️ <b>নতুন ভিডিও আপলোড হয়েছে!</b>\n\n` +
                                      `🔗 <b>Video link :</b> ${finalAppLink}\n` +
                                      `📦 <b>Video size :</b> ${videoSizeMB}\n` +
                                      `📅 <b>Upload date :</b> ${uploadDateStr}`;
@@ -1059,23 +1100,24 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             }
 
             const inlineKeyboardButtons = [];
-            inlineKeyboardButtons.push([{ text: str.play_online, url: finalAppLink }]);
 
-            const row2 = [];
+            const row1 = [];
             if (audio) {
-                row2.push({ text: str.get_music, callback_data: "send_audio" });
+                row1.push({ text: str.get_music, callback_data: "send_audio" });
             }
             if (messageId) {
-                row2.push({ text: str.wrong_video, callback_data: `wrong_video_${messageId}` });
+                row1.push({ text: str.wrong_video, callback_data: `wrong_video_${messageId}` });
             }
-            if (row2.length > 0) {
-                inlineKeyboardButtons.push(row2);
+            if (row1.length > 0) {
+                inlineKeyboardButtons.push(row1);
             }
 
-            inlineKeyboardButtons.push([{ text: str.lang_btn, callback_data: lang === 'en' ? 'setlang_bn' : 'setlang_en' }]);
+            inlineKeyboardButtons.push([{ text: str.play_online, url: finalAppLink }]);
+
+            const videoCaption = await buildVideoCaption(lang, url);
 
             const videoOpts = { 
-                caption: `Use This - @SnapSavingBot` + adTextCaption,
+                caption: videoCaption,
                 parse_mode: 'HTML',
                 reply_markup: { inline_keyboard: inlineKeyboardButtons }
             };
@@ -1089,7 +1131,12 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             }
 
             await bot.sendVideo(chatId, finalVideoSource, videoOpts);
-            
+
+            // Sending a message with an inline keyboard can hide Telegram's
+            // persistent reply keyboard on some clients -- resend it here so
+            // the "🇧🇩 বাংলা / 🇬🇧 English" keyboard button reappears.
+            await bot.sendMessage(chatId, str.video_ready_msg, chatBoxConfig).catch(() => {});
+
             setTimeout(() => {
                 bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             }, 1000);
