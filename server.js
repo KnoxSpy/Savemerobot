@@ -397,7 +397,10 @@ app.get('/api/user/lang', async (req, res) => {
 
 app.post('/api/videos', async (req, res) => {
     try {
-        const { seenVideos } = req.body;
+        const { seenVideos, limit, offset } = req.body;
+        const pageLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
+        const pageOffset = Number.isInteger(offset) && offset > 0 ? offset : 0;
+
         const snap = await db.ref('mini_app_videos').once('value');
         const data = snap.val() || {};
 
@@ -424,17 +427,25 @@ app.post('/api/videos', async (req, res) => {
             return video;
         });
 
+        // Newest videos first
+        videoList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        // Refresh / feed loading always brings videos the user hasn't
+        // watched yet to the front. If everything has already been seen,
+        // start over from the top instead of showing an empty feed.
         let wasReset = false;
         const seenSet = new Set(seenVideos || []);
-        let filteredList = videoList.filter(video => !seenSet.has(video.id));
+        let workingList = videoList.filter(video => !seenSet.has(video.id));
 
-        if (filteredList.length === 0 && videoList.length > 0) {
-            filteredList = videoList;
+        if (workingList.length === 0 && videoList.length > 0) {
+            workingList = videoList;
             wasReset = true;
         }
 
+        const pageVideos = workingList.slice(pageOffset, pageOffset + pageLimit);
+
         res.json({
-            videos: filteredList,
+            videos: pageVideos,
             wasReset
         });
     } catch (e) {
@@ -673,6 +684,35 @@ async function getMissingChannels(userId) {
     } catch (e) { return []; }
 }
 
+const MAX_VIDEOS_IN_FEED = 50;
+
+// Keeps at most MAX_VIDEOS_IN_FEED videos stored. When a new upload pushes
+// the total over the limit, the oldest video(s) are removed -- both from
+// the database and from the source channel post.
+async function enforceVideoLimit() {
+    try {
+        const snap = await db.ref('mini_app_videos').once('value');
+        const data = snap.val() || {};
+        const entries = Object.keys(data).map(key => ({
+            id: key,
+            timestamp: data[key].timestamp || 0
+        }));
+
+        if (entries.length <= MAX_VIDEOS_IN_FEED) return;
+
+        entries.sort((a, b) => a.timestamp - b.timestamp); // oldest first
+        const excessCount = entries.length - MAX_VIDEOS_IN_FEED;
+        const toRemove = entries.slice(0, excessCount);
+
+        for (const item of toRemove) {
+            await db.ref(`mini_app_videos/${item.id}`).remove();
+            await bot.deleteMessage(`@${TARGET_CHANNEL}`, parseInt(item.id)).catch(() => {});
+        }
+    } catch (err) {
+        console.error("Failed to enforce the 50-video limit:", err.message);
+    }
+}
+
 // Detects which platform a video link came from, used in the "Shots by:" line.
 function detectPlatform(url) {
     const u = (url || '').toLowerCase();
@@ -743,6 +783,8 @@ bot.on('channel_post', async (msg) => {
                         uploaderPic: uploaderPic,
                         timestamp: admin.database.ServerValue.TIMESTAMP
                     });
+
+                    await enforceVideoLimit();
                 }
             } catch (err) {
                 console.error("Secondary channel post sync error:", err.message);
@@ -1080,6 +1122,8 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                         uploaderPic: profile.photoUrl,
                         timestamp: admin.database.ServerValue.TIMESTAMP
                     });
+
+                    await enforceVideoLimit();
 
                     const adminMsg = `⚠️ <b>নতুন ভিডিও আপলোড হয়েছে!</b>\n\n` +
                                      `🔗 <b>Video link :</b> ${finalAppLink}\n` +
