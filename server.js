@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const path = require('path');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const FormData = require('form-data');
 
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception occurred:', err);
@@ -23,6 +24,15 @@ const TARGET_CHANNEL = 'reelsuploder';
 const ADMIN_ID = '7304915019'; 
 
 const DOMAIN_NAME = process.env.DOMAIN_NAME || 'snapsaving-reels.vercel.app';
+
+// Always used as the @reelsuploder channel's profile photo (never expires,
+// unlike a Telegram file link).
+const OFFICIAL_CHANNEL_LOGO = 'https://i.ibb.co.com/k2XxzhX4/IMG-20260816-154019-968.jpg';
+
+// Used to upload user profile photos to ImgBB so the link never expires --
+// this is what was causing old videos to show a broken/default photo.
+// Move this to an environment variable in production.
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY || 'ca95019d75ac10f6e3411ac3a9645824';
 
 // strings অবজেক্টে সেভ ক্যাপশনের নতুন ট্রান্সলেশন যুক্ত করা হয়েছে
 const strings = {
@@ -154,21 +164,77 @@ const chatBoxConfig = {
     reply_markup: {
         keyboard: [[{ text: "🇧🇩 বাংলা / 🇬🇧 English" }]],
         resize_keyboard: true,
+        is_persistent: true,
         input_field_placeholder: "Send links to download"
     }
 };
+
+// Uploads image bytes to ImgBB and returns the permanent public URL, or
+// null if the upload failed for any reason.
+async function uploadBufferToImgbb(buffer, name) {
+    try {
+        const form = new FormData();
+        form.append('image', buffer.toString('base64'));
+        form.append('name', name);
+
+        const res = await axios.post(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, form, {
+            headers: form.getHeaders()
+        });
+
+        if (res.data && res.data.success) {
+            return res.data.data.url;
+        }
+        return null;
+    } catch (err) {
+        console.error("ImgBB upload failed:", err.message);
+        return null;
+    }
+}
 
 async function getUserProfileInfo(userId) {
     try {
         const chat = await bot.getChat(userId);
         const name = chat.first_name ? `${chat.first_name} ${chat.last_name || ''}`.trim() : (chat.title || chat.username || "Anonymous");
-        
-        let photoUrl = "https://via.placeholder.com/150";
+
+        const cacheRef = db.ref(`user_profile_photos/${userId}`);
+        const cachedSnap = await cacheRef.once('value');
+        const cached = cachedSnap.val();
+
         if (chat.photo && chat.photo.small_file_id) {
+            // Same photo as last time and we already have a permanent
+            // ImgBB link for it -- reuse it instead of re-uploading.
+            if (cached && cached.fileId === chat.photo.small_file_id && cached.url) {
+                return { name, photoUrl: cached.url };
+            }
+
             const file = await bot.getFile(chat.photo.small_file_id);
-            photoUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+            const tempTelegramUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+
+            // Download the photo bytes and re-host them on ImgBB so the
+            // link never expires -- this is what was causing old videos to
+            // show a broken / default profile photo.
+            try {
+                const fileRes = await axios.get(tempTelegramUrl, { responseType: 'arraybuffer' });
+                const permanentUrl = await uploadBufferToImgbb(Buffer.from(fileRes.data), `user_${userId}`);
+                if (permanentUrl) {
+                    await cacheRef.set({ fileId: chat.photo.small_file_id, url: permanentUrl });
+                    return { name, photoUrl: permanentUrl };
+                }
+            } catch (uploadErr) {
+                console.error("Profile photo re-host failed:", uploadErr.message);
+            }
+
+            // ImgBB upload failed -- fall back to the temporary Telegram
+            // link rather than losing the photo entirely.
+            return { name, photoUrl: tempTelegramUrl };
         }
-        return { name, photoUrl };
+
+        // No current Telegram photo -- reuse a previously cached one if we have it.
+        if (cached && cached.url) {
+            return { name, photoUrl: cached.url };
+        }
+
+        return { name, photoUrl: "https://via.placeholder.com/150" };
     } catch (err) {
         return { name: "Anonymous", photoUrl: "https://via.placeholder.com/150" };
     }
@@ -205,14 +271,6 @@ async function sendDynamicNotification(uploaderId, videoId, type, triggerUser = 
             } else if (type === 'save') {
                 message = `${str.notif_save_title}` +
                           `👤 <b>${str.notif_name}:</b> ${viewerName}`;
-            }
-
-            const adminSnap = await db.ref('admin_settings').once('value');
-            const adminSettings = adminSnap.val() || {};
-            const ads = adminSettings.ads || [];
-            if (ads.length > 0) {
-                const randomAd = ads[Math.floor(Math.random() * ads.length)];
-                message += `\n\n<b>Ads:</b> <a href="${randomAd.link}"><b>${randomAd.text}</b></a>`;
             }
 
             const inlineKeyboard = [[{
@@ -333,6 +391,51 @@ app.post('/api/admin/del-ad', async (req, res) => {
         }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// One-time fix for already-stored old videos whose uploaderPic is a broken /
+// expired Telegram file link. Re-fetches each unique uploader's photo, hosts
+// it permanently on ImgBB, and updates every one of their videos.
+app.post('/api/admin/fix-old-photos', async (req, res) => {
+    try {
+        const snap = await db.ref('mini_app_videos').once('value');
+        const data = snap.val() || {};
+
+        const uploaderToVideoIds = {};
+        Object.keys(data).forEach(videoId => {
+            const uploaderId = data[videoId].uploaderId;
+            if (!uploaderId) return;
+            if (!uploaderToVideoIds[uploaderId]) uploaderToVideoIds[uploaderId] = [];
+            uploaderToVideoIds[uploaderId].push(videoId);
+        });
+
+        let fixedUploaders = 0;
+        let fixedVideos = 0;
+
+        for (const uploaderId of Object.keys(uploaderToVideoIds)) {
+            let newPhotoUrl = null;
+
+            if (uploaderId.startsWith('-100') || uploaderId === TARGET_CHANNEL) {
+                // The official channel always uses the fixed logo.
+                newPhotoUrl = OFFICIAL_CHANNEL_LOGO;
+            } else {
+                const profile = await getUserProfileInfo(uploaderId).catch(() => null);
+                if (profile && profile.photoUrl) newPhotoUrl = profile.photoUrl;
+            }
+
+            if (!newPhotoUrl) continue;
+
+            for (const videoId of uploaderToVideoIds[uploaderId]) {
+                await db.ref(`mini_app_videos/${videoId}/uploaderPic`).set(newPhotoUrl);
+                fixedVideos++;
+            }
+            fixedUploaders++;
+        }
+
+        res.json({ success: true, fixedUploaders, fixedVideos });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.post('/api/admin/broadcast', async (req, res) => {
@@ -770,7 +873,7 @@ bot.on('channel_post', async (msg) => {
 
                     let uploaderId = msg.chat.id.toString();
                     let uploaderName = `@${msg.chat.username}` || msg.chat.title || "Reels Uploader";
-                    let uploaderPic = "https://via.placeholder.com/150";
+                    let uploaderPic = OFFICIAL_CHANNEL_LOGO;
 
                     await dbRef.set({
                         fileId: fileId,
