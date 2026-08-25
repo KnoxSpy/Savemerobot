@@ -59,6 +59,33 @@
         .item-actions button { padding: 4px 10px; font-size: 12px; }
 
         .helper-text { font-size: 12px; color: var(--text-sub); margin-top: -10px; margin-bottom: 15px; display: block; }
+
+        /* Pin All User toggle */
+        .pin-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 15px;
+        }
+        .pin-toggle-row .pin-label { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .pin-toggle-row .pin-sub { font-size: 12px; color: var(--text-sub); font-weight: 400; display: block; margin-top: 2px; }
+
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e0; transition: .2s; border-radius: 30px;
+        }
+        .switch .slider:before {
+            position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background-color: white; transition: .2s; border-radius: 50%;
+        }
+        .switch input:checked + .slider { background-color: var(--success); }
+        .switch input:checked + .slider:before { transform: translateX(20px); }
     </style>
 </head>
 <body>
@@ -149,6 +176,17 @@
                 <label>Inline Buttons (Format: Button Name | Link - per line)</label>
                 <textarea id="bcButtons" rows="3" placeholder="Visit Website | https://google.com&#10;Join Channel | https://t.me/channel"></textarea>
                 <span class="helper-text">প্রতি লাইনে একটি বাটন দিতে হবে। ফরম্যাট: Button Name | URL</span>
+
+                <div class="pin-toggle-row">
+                    <span class="pin-label">
+                        📌 Pin All User
+                        <span class="pin-sub">On থাকলে broadcast পাঠানোর পর প্রতিটি ইউজারের চ্যাটে মেসেজটি স্বয়ংক্রিয়ভাবে Pin হয়ে যাবে</span>
+                    </span>
+                    <label class="switch">
+                        <input type="checkbox" id="bcPinAll">
+                        <span class="slider"></span>
+                    </label>
+                </div>
 
                 <button onclick="sendBroadcast()">Send Broadcast</button>
             </div>
@@ -321,20 +359,26 @@
             const photoUrl = document.getElementById('bcPhotoUrl').value;
             const message = document.getElementById('bcMessage').value;
             const buttonsText = document.getElementById('bcButtons').value;
+            const pinMessage = document.getElementById('bcPinAll').checked;
 
             if(!message) {
                 alert("Message cannot be empty!");
                 return;
             }
 
-            if (confirm("Do you want to send this broadcast to all users?")) {
+            const confirmText = pinMessage
+                ? "Do you want to send this broadcast to all users and pin it in every user's chat?"
+                : "Do you want to send this broadcast to all users?";
+
+            if (confirm(confirmText)) {
                 const res = await fetch('/api/admin/broadcast', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ type, photoUrl, message, buttonsText })
+                    body: JSON.stringify({ type, photoUrl, message, buttonsText, pinMessage })
                 });
                 const result = await res.json();
-                alert(`Broadcast dynamic update completed. Success: ${result.successCount}, Failed: ${result.failCount}`);
+                const pinInfo = pinMessage ? `, Pinned: ${result.pinnedCount || 0}` : '';
+                alert(`Broadcast dynamic update completed. Success: ${result.successCount}, Failed: ${result.failCount}${pinInfo}`);
             }
         }
 
