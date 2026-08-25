@@ -34,6 +34,9 @@ const OFFICIAL_CHANNEL_LOGO = 'https://i.ibb.co.com/k2XxzhX4/IMG-20260816-154019
 // Move this to an environment variable in production.
 const IMGBB_API_KEY = process.env.IMGBB_API_KEY || 'ca95019d75ac10f6e3411ac3a9645824';
 
+// Shown while a video link is being processed, replacing the "⏳" emoji.
+const LOADING_STICKER_FILE_ID = 'BQACAgUAAyEFAATk6e-_AAIOCWqMHyZxVof1tI4b-uvczoUglJhWAAJpIQACfadhVAEJgt88S9kZPQQ';
+
 // strings অবজেক্টে সেভ ক্যাপশনের নতুন ট্রান্সলেশন যুক্ত করা হয়েছে
 const strings = {
     en: {
@@ -439,7 +442,7 @@ app.post('/api/admin/fix-old-photos', async (req, res) => {
 });
 
 app.post('/api/admin/broadcast', async (req, res) => {
-    const { type, photoUrl, message, buttonsText } = req.body;
+    const { type, photoUrl, message, buttonsText, pinMessage } = req.body;
     
     try {
         const inline_keyboard = [];
@@ -466,22 +469,33 @@ app.post('/api/admin/broadcast', async (req, res) => {
 
         let successCount = 0;
         let failCount = 0;
+        let pinnedCount = 0;
 
         for (const userId of users) {
             try {
+                let sentMessage;
                 if (type === 'photo' && photoUrl) {
-                    await bot.sendPhoto(userId, photoUrl, { ...options, caption: message });
+                    sentMessage = await bot.sendPhoto(userId, photoUrl, { ...options, caption: message });
                 } else {
-                    await bot.sendMessage(userId, message, options);
+                    sentMessage = await bot.sendMessage(userId, message, options);
                 }
                 successCount++;
+
+                if (pinMessage && sentMessage && sentMessage.message_id) {
+                    try {
+                        await bot.pinChatMessage(userId, sentMessage.message_id, { disable_notification: true });
+                        pinnedCount++;
+                    } catch (pinErr) {
+                        // User may have blocked the bot or disabled pinning -- safe to ignore.
+                    }
+                }
             } catch (e) {
                 failCount++;
             }
             await new Promise(resolve => setTimeout(resolve, 40)); 
         }
 
-        res.json({ success: true, successCount, failCount });
+        res.json({ success: true, successCount, failCount, pinnedCount });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1146,7 +1160,8 @@ async function processDownload(chatId, url, msgId, rawMsg) {
         } catch (e) {}
     }
 
-    const loadingMsg = await bot.sendMessage(chatId, "⏳", chatBoxConfig);
+    const stickerMsg = await bot.sendSticker(chatId, LOADING_STICKER_FILE_ID, chatBoxConfig).catch(() => null);
+    const loadingMsg = await bot.sendMessage(chatId, `⏳ Loading... [${getProgressBar(0)}] 0%`);
     let progress = 0;
     let isDownloaded = false;
 
@@ -1285,17 +1300,20 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             await bot.sendMessage(chatId, str.video_ready_msg, chatBoxConfig).catch(() => {});
 
             setTimeout(() => {
+                if (stickerMsg) bot.deleteMessage(chatId, stickerMsg.message_id).catch(() => {});
                 bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             }, 1000);
         } else {
             isDownloaded = true;
             clearInterval(interval);
+            if (stickerMsg) await bot.deleteMessage(chatId, stickerMsg.message_id).catch(() => {});
             await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
         }
     } catch (e) {
         isDownloaded = true;
         clearInterval(interval);
+        if (stickerMsg) await bot.deleteMessage(chatId, stickerMsg.message_id).catch(() => {});
         await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
         await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
     }
