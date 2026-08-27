@@ -162,6 +162,7 @@
                 <select id="bcType" onchange="toggleBcFields()">
                     <option value="text">Text Only</option>
                     <option value="photo">Photo with Caption</option>
+                    <option value="forward">Forward Channel Post</option>
                 </select>
 
                 <div id="photoField" style="display: none;">
@@ -169,13 +170,23 @@
                     <input type="text" id="bcPhotoUrl" placeholder="https://example.com/image.jpg">
                 </div>
 
-                <label>Message Content (HTML Supported)</label>
-                <textarea id="bcMessage" rows="6" placeholder="<b>Bold Text</b> or normal text."></textarea>
-                <span class="helper-text">Telegram HTML Tags: &lt;b&gt;, &lt;i&gt;, &lt;code&gt;, &lt;a href=""&gt;</span>
+                <div id="forwardField" style="display: none;">
+                    <label>Channel Post Link</label>
+                    <input type="text" id="bcPostLink" placeholder="https://t.me/channelusername/123">
+                    <span class="helper-text">যে পোস্টটি সব ইউজারের কাছে ফরওয়ার্ড করতে চান তার লিংক দিন (পাবলিক চ্যানেল)। বট-কে অবশ্যই ওই চ্যানেলে Admin হিসেবে যুক্ত থাকতে হবে, নাহলে ফরওয়ার্ড করতে পারবে না।</span>
+                </div>
 
-                <label>Inline Buttons (Format: Button Name | Link - per line)</label>
-                <textarea id="bcButtons" rows="3" placeholder="Visit Website | https://google.com&#10;Join Channel | https://t.me/channel"></textarea>
-                <span class="helper-text">প্রতি লাইনে একটি বাটন দিতে হবে। ফরম্যাট: Button Name | URL</span>
+                <div id="messageFieldGroup">
+                    <label>Message Content (HTML Supported)</label>
+                    <textarea id="bcMessage" rows="6" placeholder="<b>Bold Text</b> or normal text."></textarea>
+                    <span class="helper-text">Telegram HTML Tags: &lt;b&gt;, &lt;i&gt;, &lt;code&gt;, &lt;a href=""&gt;</span>
+                </div>
+
+                <div id="buttonsFieldGroup">
+                    <label>Inline Buttons (Format: Button Name | Link - per line)</label>
+                    <textarea id="bcButtons" rows="3" placeholder="Visit Website | https://google.com&#10;Join Channel | https://t.me/channel"></textarea>
+                    <span class="helper-text">প্রতি লাইনে একটি বাটন দিতে হবে। ফরম্যাট: Button Name | URL</span>
+                </div>
 
                 <div class="pin-toggle-row">
                     <span class="pin-label">
@@ -223,6 +234,11 @@
         function toggleBcFields() {
             const type = document.getElementById('bcType').value;
             document.getElementById('photoField').style.display = type === 'photo' ? 'block' : 'none';
+            document.getElementById('forwardField').style.display = type === 'forward' ? 'block' : 'none';
+
+            const isForward = type === 'forward';
+            document.getElementById('messageFieldGroup').style.display = isForward ? 'none' : 'block';
+            document.getElementById('buttonsFieldGroup').style.display = isForward ? 'none' : 'block';
         }
 
         async function loadData() {
@@ -359,9 +375,15 @@
             const photoUrl = document.getElementById('bcPhotoUrl').value;
             const message = document.getElementById('bcMessage').value;
             const buttonsText = document.getElementById('bcButtons').value;
+            const postLink = document.getElementById('bcPostLink').value;
             const pinMessage = document.getElementById('bcPinAll').checked;
 
-            if(!message) {
+            if (type === 'forward') {
+                if (!postLink) {
+                    alert("Please enter the channel post link to forward!");
+                    return;
+                }
+            } else if (!message) {
                 alert("Message cannot be empty!");
                 return;
             }
@@ -374,9 +396,15 @@
                 const res = await fetch('/api/admin/broadcast', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ type, photoUrl, message, buttonsText, pinMessage })
+                    body: JSON.stringify({ type, photoUrl, message, buttonsText, pinMessage, postLink })
                 });
                 const result = await res.json();
+
+                if (result.error) {
+                    alert(`Error: ${result.error}`);
+                    return;
+                }
+
                 const pinInfo = pinMessage ? `, Pinned: ${result.pinnedCount || 0}` : '';
                 alert(`Broadcast dynamic update completed. Success: ${result.successCount}, Failed: ${result.failCount}${pinInfo}`);
             }
