@@ -307,6 +307,46 @@ async function getSettingsKeyboard(chatId) {
 }
 
 app.get('/', (req, res) => { res.send('Bot is running...'); });
+
+// Polled by the admin dashboard to show live Server / Bot API / Database
+// status plus response time, and the current total video count.
+app.get('/api/admin/health', async (req, res) => {
+    const startedAt = Date.now();
+    const health = {
+        server: true, // reaching this handler already proves the server is up
+        serverUptimeSeconds: Math.floor(process.uptime()),
+        database: false,
+        bot: false,
+        totalVideos: 0,
+        checkedAt: startedAt
+    };
+
+    try {
+        await db.ref('admin_settings').limitToFirst(1).once('value');
+        health.database = true;
+    } catch (e) {
+        health.database = false;
+    }
+
+    try {
+        await bot.getMe();
+        health.bot = true;
+    } catch (e) {
+        health.bot = false;
+    }
+
+    try {
+        const snap = await db.ref('mini_app_videos').once('value');
+        health.totalVideos = snap.numChildren() || 0;
+    } catch (e) {
+        health.totalVideos = 0;
+    }
+
+    health.responseTimeMs = Date.now() - startedAt;
+    health.api = health.database && health.bot;
+
+    res.json(health);
+});
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'indexadmin.html')); });
 app.get('/reels', (req, res) => { res.sendFile(path.join(__dirname, 'reels.html')); });
 
@@ -320,6 +360,7 @@ app.get('/api/admin/data', async (req, res) => {
         const monthlySnap = await db.ref(`monthly_stats/${currentMonth}`).once('value');
         const totalUsersSnap = await db.ref('all_users').once('value');
         const downloadsSnap = await db.ref('stats/total_downloads').once('value');
+        const videosSnap = await db.ref('mini_app_videos').once('value');
 
         const settings = adminSnap.val() || {};
         
@@ -327,6 +368,7 @@ app.get('/api/admin/data', async (req, res) => {
         settings.monthlyUsers = monthlySnap.numChildren() || 0;
         settings.totalUsers = totalUsersSnap.numChildren() || 0;
         settings.totalDownloads = downloadsSnap.val() || 0;
+        settings.totalVideos = videosSnap.numChildren() || 0;
 
         if (!settings.channels) settings.channels = [];
         if (!settings.ads) settings.ads = [];
