@@ -441,28 +441,65 @@ app.post('/api/admin/fix-old-photos', async (req, res) => {
     }
 });
 
-app.post('/api/admin/broadcast', async (req, res) => {
-    const { type, photoUrl, message, buttonsText, pinMessage } = req.body;
-    
+// Parses a Telegram post link into { chatId, messageId } so it can be
+// forwarded. Supports public channels (t.me/username/123) and, if the bot
+// is already a member, private channels (t.me/c/<internal_id>/123).
+function parseTelegramPostLink(link) {
     try {
-        const inline_keyboard = [];
-        if (buttonsText && buttonsText.trim()) {
-            const lines = buttonsText.split('\n');
-            lines.forEach(line => {
-                const parts = line.split('|');
-                if (parts.length === 2) {
-                    inline_keyboard.push([{
-                        text: parts[0].trim(),
-                        url: parts[1].trim()
-                    }]);
-                }
-            });
+        const url = new URL((link || '').trim());
+        if (!url.hostname.includes('t.me')) return null;
+        const parts = url.pathname.split('/').filter(Boolean);
+
+        if (parts[0] === 'c' && parts.length >= 3) {
+            const internalId = parts[1];
+            const messageId = parseInt(parts[2], 10);
+            if (!internalId || !messageId) return null;
+            return { chatId: `-100${internalId}`, messageId };
         }
 
-        const options = {
-            parse_mode: 'HTML',
-            reply_markup: inline_keyboard.length > 0 ? { inline_keyboard } : undefined
-        };
+        if (parts.length >= 2) {
+            const username = parts[0];
+            const messageId = parseInt(parts[1], 10);
+            if (!username || !messageId) return null;
+            return { chatId: `@${username}`, messageId };
+        }
+
+        return null;
+    } catch (err) {
+        return null;
+    }
+}
+
+app.post('/api/admin/broadcast', async (req, res) => {
+    const { type, photoUrl, message, buttonsText, pinMessage, postLink } = req.body;
+    
+    try {
+        let forwardSource = null;
+        let options = { parse_mode: 'HTML' };
+
+        if (type === 'forward') {
+            forwardSource = parseTelegramPostLink(postLink);
+            if (!forwardSource) {
+                return res.status(400).json({
+                    error: "Invalid post link. Use a format like https://t.me/channelusername/123"
+                });
+            }
+        } else {
+            const inline_keyboard = [];
+            if (buttonsText && buttonsText.trim()) {
+                const lines = buttonsText.split('\n');
+                lines.forEach(line => {
+                    const parts = line.split('|');
+                    if (parts.length === 2) {
+                        inline_keyboard.push([{
+                            text: parts[0].trim(),
+                            url: parts[1].trim()
+                        }]);
+                    }
+                });
+            }
+            options.reply_markup = inline_keyboard.length > 0 ? { inline_keyboard } : undefined;
+        }
 
         const usersSnap = await db.ref('all_users').once('value');
         const users = usersSnap.val() ? Object.keys(usersSnap.val()) : [];
@@ -474,7 +511,10 @@ app.post('/api/admin/broadcast', async (req, res) => {
         for (const userId of users) {
             try {
                 let sentMessage;
-                if (type === 'photo' && photoUrl) {
+                if (type === 'forward') {
+                    // Bot must be an admin member of the source channel to forward its posts.
+                    sentMessage = await bot.forwardMessage(userId, forwardSource.chatId, forwardSource.messageId);
+                } else if (type === 'photo' && photoUrl) {
                     sentMessage = await bot.sendPhoto(userId, photoUrl, { ...options, caption: message });
                 } else {
                     sentMessage = await bot.sendMessage(userId, message, options);
