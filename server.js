@@ -1228,19 +1228,24 @@ function getProgressBar(percent) {
     return "■".repeat(filledBars) + "□".repeat(emptyBars);
 }
 
+// Reacts to a specific message with a single emoji (used to show live
+// status on the user's link message: 👀 processing, 🔥 done, 💩 failed).
+async function setMsgReaction(chatId, messageId, emoji) {
+    if (!messageId) return;
+    try {
+        await bot._request('setMessageReaction', {
+            chat_id: chatId,
+            message_id: messageId,
+            reaction: JSON.stringify([{ type: 'emoji', emoji }])
+        });
+    } catch (e) {}
+}
+
 async function processDownload(chatId, url, msgId, rawMsg) {
     const lang = await getUserLang(chatId);
     const str = strings[lang];
 
-    if (msgId) {
-        try {
-            await bot._request('setMessageReaction', {
-                chat_id: chatId,
-                message_id: msgId,
-                reaction: JSON.stringify([{ type: 'emoji', emoji: '👀' }])
-            });
-        } catch (e) {}
-    }
+    await setMsgReaction(chatId, msgId, '👀');
 
     const stickerMsg = await bot.sendSticker(chatId, LOADING_STICKER_FILE_ID, chatBoxConfig).catch(() => null);
     const loadingMsg = await bot.sendMessage(chatId, `⏳ Loading... [${getProgressBar(0)}] 0%`);
@@ -1375,6 +1380,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             }
 
             await bot.sendVideo(chatId, finalVideoSource, videoOpts);
+            await setMsgReaction(chatId, msgId, '🔥');
 
             // Sending a message with an inline keyboard can hide Telegram's
             // persistent reply keyboard on some clients -- resend it here so
@@ -1390,6 +1396,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             clearInterval(interval);
             if (stickerMsg) await bot.deleteMessage(chatId, stickerMsg.message_id).catch(() => {});
             await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
+            await setMsgReaction(chatId, msgId, '💩');
             await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
         }
     } catch (e) {
@@ -1397,6 +1404,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
         clearInterval(interval);
         if (stickerMsg) await bot.deleteMessage(chatId, stickerMsg.message_id).catch(() => {});
         await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
+        await setMsgReaction(chatId, msgId, '💩');
         await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
     }
 }
