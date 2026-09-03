@@ -37,6 +37,10 @@ const IMGBB_API_KEY = process.env.IMGBB_API_KEY || 'ca95019d75ac10f6e3411ac3a964
 // Shown while a video link is being processed, replacing the "⏳" emoji.
 const LOADING_STICKER_FILE_ID = 'BQACAgUAAyEFAATk6e-_AAIOCWqMHyZxVof1tI4b-uvczoUglJhWAAJpIQACfadhVAEJgt88S9kZPQQ';
 
+// Telegram's built-in full-screen "Fire" message effect (message_effect_id),
+// played when the downloaded video is delivered to the user.
+const TELEGRAM_EFFECT_FIRE = '5104841245755180586';
+
 // strings অবজেক্টে সেভ ক্যাপশনের নতুন ট্রান্সলেশন যুক্ত করা হয়েছে
 const strings = {
     en: {
@@ -1234,11 +1238,15 @@ async function setMsgReaction(chatId, messageId, emoji) {
     if (!messageId) return;
     try {
         await bot._request('setMessageReaction', {
-            chat_id: chatId,
-            message_id: messageId,
-            reaction: JSON.stringify([{ type: 'emoji', emoji }])
+            form: {
+                chat_id: chatId,
+                message_id: messageId,
+                reaction: JSON.stringify([{ type: 'emoji', emoji }])
+            }
         });
-    } catch (e) {}
+    } catch (e) {
+        console.error('setMessageReaction failed:', e.message);
+    }
 }
 
 async function processDownload(chatId, url, msgId, rawMsg) {
@@ -1368,7 +1376,8 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             const videoOpts = { 
                 caption: videoCaption,
                 parse_mode: 'HTML',
-                reply_markup: { inline_keyboard: inlineKeyboardButtons }
+                reply_markup: { inline_keyboard: inlineKeyboardButtons },
+                message_effect_id: TELEGRAM_EFFECT_FIRE
             };
 
             let finalVideoSource = video.url;
