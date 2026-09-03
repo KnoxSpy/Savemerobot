@@ -82,7 +82,7 @@ const strings = {
         caption_shots_by: "Shots by:",
         caption_download_by: "Download by: @SnapSavingBot",
         caption_ads_prefix: "Ads |",
-        video_ready_msg: "✅ Ready! Send another link anytime.",
+        video_ready_msg: "✅ Ready! Send another link anytime. 🎉",
         
         // New Mini-App Save Caption
         save_success_caption: "💿 <b>Save Success!</b>\n\nThis video has been saved from @SnapSavingBot. <a href=\"https://t.me/SnapSavingBot/reels\">Click here</a> for more Reels of this type.",
@@ -134,7 +134,7 @@ const strings = {
         caption_shots_by: "Shots by:",
         caption_download_by: "Download by: @SnapSavingBot",
         caption_ads_prefix: "Ads |",
-        video_ready_msg: "✅ প্রস্তুত! যেকোনো সময় আরেকটি লিংক পাঠান।",
+        video_ready_msg: "✅ প্রস্তুত! যেকোনো সময় আরেকটি লিংক পাঠান। 🎉",
         
         // New Mini-App Save Caption
         save_success_caption: "💿 <b>সেভ সফল হয়েছে!</b>\n\nএই ভিডিওটি @SnapSavingBot থেকে সেভ করা হয়েছে। এই ধরণের আরও রিল দেখতে <a href=\"https://t.me/SnapSavingBot/reels\">এখানে ক্লিক করুন</a>।",
@@ -1256,7 +1256,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
     await setMsgReaction(chatId, msgId, '👀');
 
     const stickerMsg = await bot.sendSticker(chatId, LOADING_STICKER_FILE_ID, chatBoxConfig).catch(() => null);
-    const loadingMsg = await bot.sendMessage(chatId, `⏳ Loading... [${getProgressBar(0)}] 0%`);
+    const loadingMsg = await bot.sendMessage(chatId, `⏳ Loading... ${getProgressBar(0)} 0%`);
     let progress = 0;
     let isDownloaded = false;
 
@@ -1265,7 +1265,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             progress += Math.floor(Math.random() * 10) + 5;
             if (progress > 95) progress = 95;
             const bar = getProgressBar(progress);
-            await bot.editMessageText(`⏳ Loading... [${bar}] ${progress}%`, {
+            await bot.editMessageText(`⏳ Loading... ${bar} ${progress}%`, {
                 chat_id: chatId,
                 message_id: loadingMsg.message_id
             }).catch(() => {});
@@ -1280,7 +1280,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             isDownloaded = true;
             clearInterval(interval);
 
-            await bot.editMessageText(`🪄 Success [${getProgressBar(100)}] 100%`, {
+            await bot.editMessageText(`${getProgressBar(100)} 100% Success`, {
                 chat_id: chatId,
                 message_id: loadingMsg.message_id
             }).catch(() => {});
@@ -1391,15 +1391,17 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             await bot.sendVideo(chatId, finalVideoSource, videoOpts);
             await setMsgReaction(chatId, msgId, '🔥');
 
-            // Sending a message with an inline keyboard can hide Telegram's
-            // persistent reply keyboard on some clients -- resend it here so
-            // the "🇧🇩 বাংলা / 🇬🇧 English" keyboard button reappears.
-            await bot.sendMessage(chatId, str.video_ready_msg, chatBoxConfig).catch(() => {});
-
             setTimeout(() => {
                 if (stickerMsg) bot.deleteMessage(chatId, stickerMsg.message_id).catch(() => {});
                 bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             }, 1000);
+
+            // Sending a message with an inline keyboard can hide Telegram's
+            // persistent reply keyboard on some clients -- resend it a couple
+            // seconds after the video so it reappears without feeling instant.
+            setTimeout(() => {
+                bot.sendMessage(chatId, str.video_ready_msg, chatBoxConfig).catch(() => {});
+            }, 2500);
         } else {
             isDownloaded = true;
             clearInterval(interval);
