@@ -169,7 +169,7 @@ const audioCache = {};
 
 const chatBoxConfig = {
     reply_markup: {
-        keyboard: [[{ text: "🇧🇩 বাংলা / 🇬🇧 English" }]],
+        keyboard: [[{ text: "Watch Reels", web_app: { url: `https://${DOMAIN_NAME}/reels` } }]],
         resize_keyboard: true,
         is_persistent: true,
         input_field_placeholder: "Send links to download"
@@ -1030,8 +1030,8 @@ bot.on('message', async (msg) => {
             }
 
             const helperText = lang === 'bn'
-                ? "👇 নিচের বাটন থেকে আপনার ভাষা পরিবর্তন করতে পারেন অথবা যেকোনো ভিডিও লিংক পাঠান।"
-                : "👇 You can change your language using the button below or send any video link to download.";
+                ? "👇 নিচের \"Watch Reels\" বাটনে ক্লিক করে রিলস দেখুন অথবা যেকোনো ভিডিও লিংক পাঠান। ভাষা পরিবর্তন করতে /settings ব্যবহার করুন।"
+                : "👇 Tap \"Watch Reels\" below to browse reels, or send any video link to download. Change language from /settings.";
             
             await bot.sendMessage(chatId, helperText, chatBoxConfig);
 
