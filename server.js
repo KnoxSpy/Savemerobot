@@ -23,7 +23,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const TARGET_CHANNEL = 'reelsuploder'; 
 const ADMIN_ID = '7304915019'; 
 
-const DOMAIN_NAME = process.env.DOMAIN_NAME || 'snapsaving-reels.vercel.app';
+const DOMAIN_NAME = process.env.DOMAIN_NAME || 'savemerobot-lpv8.onrender.com';
 
 // Always used as the @reelsuploder channel's profile photo (never expires,
 // unlike a Telegram file link).
@@ -169,7 +169,7 @@ const audioCache = {};
 
 const chatBoxConfig = {
     reply_markup: {
-        keyboard: [[{ text: "Watch Reels", web_app: { url: `https://${DOMAIN_NAME}/reels` } }]],
+        keyboard: [[{ text: "Watch Reels", style: "success", web_app: { url: `https://${DOMAIN_NAME}/reels` } }]],
         resize_keyboard: true,
         is_persistent: true,
         input_field_placeholder: "Send links to download"
@@ -1030,8 +1030,8 @@ bot.on('message', async (msg) => {
             }
 
             const helperText = lang === 'bn'
-                ? "👇 নিচের \"Watch Reels\" বাটনে ক্লিক করে রিলস দেখুন অথবা যেকোনো ভিডিও লিংক পাঠান। ভাষা পরিবর্তন করতে /settings ব্যবহার করুন।"
-                : "👇 Tap \"Watch Reels\" below to browse reels, or send any video link to download. Change language from /settings.";
+                ? "আপনি যেই ভিডিও টি ডাওনলোড করতে চান শুধু ভিডিওর লিংক দিন!"
+                : "Just send the link of the video you want to download!";
             
             await bot.sendMessage(chatId, helperText, chatBoxConfig);
 
