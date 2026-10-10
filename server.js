@@ -46,7 +46,7 @@ const strings = {
     en: {
         welcome: "Welcome to SnapSaving! Send me any social media video link to download.",
         must_join: "⚠️ You must join our channels to use this bot!",
-        verify: "✅ Verify Join",
+        verify: "Verify Join",
         not_joined: "❌ You haven't joined all channels yet!",
         sending_audio: "Sending Audio...",
         video_not_found: "❌ Video not found.",
@@ -54,27 +54,27 @@ const strings = {
         join_ch: "📢 Join Channel",
         join_gr: "👥 Join Group",
         add_gr: "➕ Add Bot to Group",
-        lang_btn: "🇧🇩 Change to বাংলা",
+        lang_btn: "Change to বাংলা",
         lang_switched: "Language changed to English.",
         settings_title: "⚙️ <b>Your Preferences & Settings</b>\n\nConfigure your Mini-App settings directly from here:",
         notify_on: "Notifications: ON 🔔",
         notify_off: "Notifications: OFF 🔕",
-        upload_on: "Reels Upload: ON 📤",
-        upload_off: "Reels Upload: OFF 📥",
-        change_lang: "Language: English 🌐",
+        upload_on: "Reels Upload: ON",
+        upload_off: "Reels Upload: OFF",
+        change_lang: "Language: English",
         watch_btn: "Watch Video",
         
         // Added Buttons
-        play_online: "🔴 Play this Video Online 🎬",
-        get_music: "Get Music 🎵",
-        wrong_video: "Wrong Video ⚠️",
+        play_online: "Play this Video Online",
+        get_music: "Get Music",
+        wrong_video: "Wrong Video",
         wrong_video_deleted: "✅ Video has been removed! Please send the link of the video you want to download.",
         check_video: "Check Video 🎬",
 
         // Settings / "Menu" inline keyboard (from /settings)
-        menu_open_app: "Open Tiktok 🎬",
-        menu_language: "Language 🌐",
-        menu_auto_upload: "Auto Upload 🛰️",
+        menu_open_app: "Open Tiktok",
+        menu_language: "Language",
+        menu_auto_upload: "Auto Upload",
         auto_upload_on_toast: "🛰️ Auto Upload is now ON",
         auto_upload_off_toast: "🛰️ Auto Upload is now OFF",
 
@@ -98,7 +98,7 @@ const strings = {
     bn: {
         welcome: "SnapSaving-এ স্বাগতম! ভিডিও ডাউনলোড করতে যেকোনো লিংক পাঠান।",
         must_join: "⚠️ আমাদের চ্যানেলে জয়েন করতে হবে এই বটটি ব্যবহার করতে!",
-        verify: "✅ ভেরিফাই করুন",
+        verify: "ভেরিফাই করুন",
         not_joined: "❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!",
         sending_audio: "অডিও পাঠানো হচ্ছে...",
         video_not_found: "❌ ভিডিও পাওয়া যায়নি।",
@@ -106,27 +106,27 @@ const strings = {
         join_ch: "📢 চ্যানেলে জয়েন করুন",
         join_gr: "👥 গ্রুপে জয়েন করুন",
         add_gr: "➕ গ্রুপে বট যুক্ত করুন",
-        lang_btn: "🇬🇧 Change to English",
+        lang_btn: "Change to English",
         lang_switched: "ভাষা পরিবর্তন করে বাংলা করা হয়েছে।",
         settings_title: "⚙️ <b>আপনার সেটিংস ও পছন্দসমূহ</b>\n\nনিচের বাটনগুলো দিয়ে আপনার মিনি অ্যাপের সেটিংস পরিবর্তন করুন:",
         notify_on: "নোটিফিকেশন: চালু 🔔",
         notify_off: "নোটিফিকেশন: বন্ধ 🔕",
-        upload_on: "রিল আপলোড: চালু 📤",
-        upload_off: "রিল আপলোড: বন্ধ 📥",
-        change_lang: "ভাষা: বাংলা 🌐",
+        upload_on: "রিল আপলোড: চালু",
+        upload_off: "রিল আপলোড: বন্ধ",
+        change_lang: "ভাষা: বাংলা",
         watch_btn: "Watch Video",
         
         // Added Buttons
-        play_online: "🔴 Play this Video Online 🎬",
-        get_music: "Get Music 🎵",
-        wrong_video: "Wrong Video ⚠️",
+        play_online: "Play this Video Online",
+        get_music: "Get Music",
+        wrong_video: "Wrong Video",
         wrong_video_deleted: "✅ ভিডিওটি রিমুভ করা হয়েছে! আপনি যে ভিডিও টি ডাউনলোড করতে চান লিংক দিন।",
         check_video: "Check Video 🎬",
 
         // Settings / "Menu" inline keyboard (from /settings)
-        menu_open_app: "Open Tiktok 🎬",
-        menu_language: "ভাষা 🌐",
-        menu_auto_upload: "অটো আপলোড 🛰️",
+        menu_open_app: "Open Tiktok",
+        menu_language: "ভাষা",
+        menu_auto_upload: "অটো আপলোড",
         auto_upload_on_toast: "🛰️ অটো আপলোড চালু হয়েছে",
         auto_upload_off_toast: "🛰️ অটো আপলোড বন্ধ হয়েছে",
 
@@ -816,7 +816,7 @@ app.post('/api/video/report', async (req, res) => {
             reply_markup: {
                 inline_keyboard: [
                     [
-                        { text: "❌ Remove Video from Server", callback_data: `remove_vid_${videoId}` }
+                        { text: "Remove Video from Server", callback_data: `remove_vid_${videoId}` }
                     ]
                 ]
             }
@@ -1059,7 +1059,7 @@ bot.on('message', async (msg) => {
             const buttons = [];
             for (let i = 0; i < missingChannels.length; i += 2) {
                 const row = missingChannels.slice(i, i + 2).map(c => ({
-                    text: `📢 ${c.name}`,
+                    text: c.name,
                     url: c.user.startsWith('http') ? c.user : `https://t.me/${c.user.replace('@','')}`
                 }));
                 buttons.push(row);
@@ -1109,13 +1109,13 @@ bot.on('callback_query', async (q) => {
                             return { ...btn, text: updatedStr.watch_btn };
                         }
                         if (btn.text === strings[lang].play_online) {
-                            return { ...btn, text: updatedStr.play_online };
+                            return { ...btn, text: updatedStr.play_online, style: "danger" };
                         }
                         if (btn.text === strings[lang].get_music) {
-                            return { ...btn, text: updatedStr.get_music };
+                            return { ...btn, text: updatedStr.get_music, style: "success" };
                         }
                         if (btn.text === strings[lang].wrong_video) {
-                            return { ...btn, text: updatedStr.wrong_video };
+                            return { ...btn, text: updatedStr.wrong_video, style: "success" };
                         }
                         return btn;
                     });
@@ -1347,7 +1347,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
                         parse_mode: 'HTML',
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: "❌ Remove this video", callback_data: `remove_vid_${messageId}` }]
+                                [{ text: "Remove this video", callback_data: `remove_vid_${messageId}` }]
                             ]
                         }
                     });
@@ -1360,16 +1360,16 @@ async function processDownload(chatId, url, msgId, rawMsg) {
 
             const row1 = [];
             if (audio) {
-                row1.push({ text: str.get_music, callback_data: "send_audio" });
+                row1.push({ text: str.get_music, style: "success", callback_data: "send_audio" });
             }
             if (messageId) {
-                row1.push({ text: str.wrong_video, callback_data: `wrong_video_${messageId}` });
+                row1.push({ text: str.wrong_video, style: "success", callback_data: `wrong_video_${messageId}` });
             }
             if (row1.length > 0) {
                 inlineKeyboardButtons.push(row1);
             }
 
-            inlineKeyboardButtons.push([{ text: str.play_online, url: finalAppLink }]);
+            inlineKeyboardButtons.push([{ text: str.play_online, style: "danger", url: finalAppLink }]);
 
             const videoCaption = await buildVideoCaption(lang, url);
 
