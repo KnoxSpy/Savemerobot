@@ -167,14 +167,19 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const userSessions = {}; 
 const audioCache = {}; 
 
-const chatBoxConfig = {
-    reply_markup: {
-        keyboard: [[{ text: "Watch Reels", style: "success", web_app: { url: `https://${DOMAIN_NAME}/reels` } }]],
-        resize_keyboard: true,
-        is_persistent: true,
-        input_field_placeholder: "Send links to download"
-    }
-};
+// Per-user reply keyboard. The user's id is added to the Mini App link so
+// the app can identify the user even when Telegram does not pass initData
+// for keyboard-button launches.
+function makeChatBox(chatId) {
+    return {
+        reply_markup: {
+            keyboard: [[{ text: "Watch Reels", style: "success", web_app: { url: `https://${DOMAIN_NAME}/reels?uid=${encodeURIComponent(chatId)}` } }]],
+            resize_keyboard: true,
+            is_persistent: true,
+            input_field_placeholder: "Send links to download"
+        }
+    };
+}
 
 // Uploads image bytes to ImgBB and returns the permanent public URL, or
 // null if the upload failed for any reason.
@@ -585,6 +590,21 @@ app.post('/api/admin/broadcast', async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+});
+
+app.get('/api/user/profile', async (req, res) => {
+    try {
+        const userId = String(req.query.userId || '').replace(/[^0-9]/g, '');
+        if (!userId) return res.json({ success: false });
+        const chat = await bot.getChat(userId).catch(() => null);
+        const info = await getUserProfileInfo(userId);
+        res.json({
+            success: true,
+            id: userId,
+            username: (chat && chat.username) || (info && info.name) || userId,
+            photo: (info && info.photoUrl) || null
+        });
+    } catch (e) { res.json({ success: false }); }
 });
 
 app.get('/api/user/lang', async (req, res) => {
@@ -1008,7 +1028,7 @@ bot.on('message', async (msg) => {
         const newLang = currentLang === 'bn' ? 'en' : 'bn';
         await db.ref(`users/${chatId}/lang`).set(newLang);
         const str = strings[newLang];
-        return bot.sendMessage(chatId, str.lang_switched, chatBoxConfig);
+        return bot.sendMessage(chatId, str.lang_switched, makeChatBox(chatId));
     }
 
     if (text === '/start') {
@@ -1033,7 +1053,7 @@ bot.on('message', async (msg) => {
                 ? "আপনি যেই ভিডিও টি ডাওনলোড করতে চান শুধু ভিডিওর লিংক দিন!"
                 : "Just send the link of the video you want to download!";
             
-            await bot.sendMessage(chatId, helperText, chatBoxConfig);
+            await bot.sendMessage(chatId, helperText, makeChatBox(chatId));
 
         } catch (e) { console.error("Start command processing error:", e); }
     }
@@ -1129,7 +1149,7 @@ bot.on('callback_query', async (q) => {
         }
 
         await bot.answerCallbackQuery(q.id, { text: updatedStr.lang_switched });
-        await bot.sendMessage(chatId, updatedStr.lang_switched, chatBoxConfig);
+        await bot.sendMessage(chatId, updatedStr.lang_switched, makeChatBox(chatId));
         return;
     }
 
@@ -1197,7 +1217,7 @@ bot.on('callback_query', async (q) => {
             await bot.deleteMessage(`@${TARGET_CHANNEL}`, parseInt(messageId)).catch(() => {});
             await bot.deleteMessage(chatId, q.message.message_id).catch(() => {});
             
-            await bot.sendMessage(chatId, str.wrong_video_deleted, chatBoxConfig);
+            await bot.sendMessage(chatId, str.wrong_video_deleted, makeChatBox(chatId));
             await bot.answerCallbackQuery(q.id, { text: "Removed successfully!" });
         } catch (err) {
             await bot.answerCallbackQuery(q.id, { text: "Error deleting video.", show_alert: true });
@@ -1255,7 +1275,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
 
     await setMsgReaction(chatId, msgId, '👀');
 
-    const stickerMsg = await bot.sendSticker(chatId, LOADING_STICKER_FILE_ID, chatBoxConfig).catch(() => null);
+    const stickerMsg = await bot.sendSticker(chatId, LOADING_STICKER_FILE_ID, makeChatBox(chatId)).catch(() => null);
     const loadingMsg = await bot.sendMessage(chatId, `⏳ Loading... ${getProgressBar(0)} 0%`);
     let progress = 0;
     let isDownloaded = false;
@@ -1400,7 +1420,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             // persistent reply keyboard on some clients -- resend it a couple
             // seconds after the video so it reappears without feeling instant.
             setTimeout(() => {
-                bot.sendMessage(chatId, str.video_ready_msg, chatBoxConfig).catch(() => {});
+                bot.sendMessage(chatId, str.video_ready_msg, makeChatBox(chatId)).catch(() => {});
             }, 2500);
         } else {
             isDownloaded = true;
@@ -1408,7 +1428,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
             if (stickerMsg) await bot.deleteMessage(chatId, stickerMsg.message_id).catch(() => {});
             await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
             await setMsgReaction(chatId, msgId, '💩');
-            await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
+            await bot.sendMessage(chatId, str.error_fetch, makeChatBox(chatId));
         }
     } catch (e) {
         isDownloaded = true;
@@ -1416,7 +1436,7 @@ async function processDownload(chatId, url, msgId, rawMsg) {
         if (stickerMsg) await bot.deleteMessage(chatId, stickerMsg.message_id).catch(() => {});
         await bot.deleteMessage(chatId, loadingMsg.message_id).catch(() => {});
         await setMsgReaction(chatId, msgId, '💩');
-        await bot.sendMessage(chatId, str.error_fetch, chatBoxConfig);
+        await bot.sendMessage(chatId, str.error_fetch, makeChatBox(chatId));
     }
 }
 
